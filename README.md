@@ -1,4 +1,4 @@
-# Identity Service
+# Authentication Service
 Authentication and authorization service for PTSS Support, built with Go and Keycloak.
 
 ### Framework Choices
@@ -9,8 +9,8 @@ Authentication and authorization service for PTSS Support, built with Go and Key
 ### Getting Started
 1. Clone the repository
 ```bash
-git clone https://github.com/ptss-support/identity-service.git
-cd identity-service
+git clone https://github.com/ptss-support/authentication-service.git
+cd authentication-service
 
 ```
 
