@@ -12,6 +12,8 @@ type AuthService interface {
 	Login(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error)
 	Register(ctx context.Context, req *requests.RegisterRequest) (*responses.CreateIdentityResponse, error)
 	GetUserInfo(ctx context.Context, token string) (*responses.UserResponse, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*responses.AuthResponse, error)
+	ValidateToken(ctx context.Context, token string) (bool, error)
 }
 
 type authService struct {
@@ -27,6 +29,14 @@ func NewAuthService(keycloakRepo repositories.KeycloakRepository) AuthService {
 func (s *authService) Login(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error) {
 	// TODO: Add pre-login validation if needed
 	return s.keycloakRepo.Login(ctx, req)
+}
+
+func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*responses.AuthResponse, error) {
+	return s.keycloakRepo.RefreshToken(ctx, refreshToken)
+}
+
+func (s *authService) ValidateToken(ctx context.Context, token string) (bool, error) {
+	return s.keycloakRepo.ValidateToken(ctx, token)
 }
 
 func (s *authService) Register(ctx context.Context, req *requests.RegisterRequest) (*responses.CreateIdentityResponse, error) {

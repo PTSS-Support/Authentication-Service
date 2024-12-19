@@ -1,12 +1,18 @@
 package controllers
 
 import (
+	"github.com/PTSS-Support/identity-service/api/dtos/responses"
 	"net/http"
 	"strings"
 
 	"github.com/PTSS-Support/identity-service/api/dtos/requests"
 	"github.com/PTSS-Support/identity-service/core/facades"
 	"github.com/gin-gonic/gin"
+)
+
+const (
+	AccessTokenCookie  = "access_token"
+	RefreshTokenCookie = "refresh_token"
 )
 
 type AuthController struct {
@@ -24,6 +30,7 @@ func (c *AuthController) RegisterRoutes(r *gin.Engine) {
 	{
 		auth.POST("/register", c.Register)
 		auth.POST("/login", c.Login)
+		auth.GET("/validate-tokens", c.ValidateTokens)
 		auth.GET("/me", c.GetUserInfo)
 	}
 }
@@ -93,4 +100,72 @@ func (c *AuthController) GetUserInfo(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, userInfo)
+}
+
+func (c *AuthController) ValidateTokens(ctx *gin.Context) {
+	accessToken := ctx.GetHeader("Authorization")
+	if accessToken == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"error": "No access token provided",
+		})
+		return
+	}
+
+	refreshToken, err := ctx.Cookie(RefreshTokenCookie)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"error": "No refresh token provided",
+		})
+		return
+	}
+
+	// If access token is invalid, try to refresh
+	valid, err := c.authFacade.ValidateToken(ctx, accessToken)
+	if !valid || err != nil {
+		// Try to refresh
+		newTokens, err := c.authFacade.HandleTokenRefresh(ctx, refreshToken)
+		if err != nil {
+			ctx.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Authentication failed",
+			})
+			return
+		}
+
+		// Set new cookies
+		setAuthCookies(ctx, newTokens)
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"status":       "tokens_refreshed",
+			"access_token": newTokens.AccessToken,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"status": "valid",
+	})
+}
+
+func setAuthCookies(ctx *gin.Context, tokens *responses.AuthResponse) {
+	// Access token cookie - NOT HTTP only, can be accessed by JavaScript
+	ctx.SetCookie(
+		AccessTokenCookie,
+		tokens.AccessToken,
+		900, // 15 minutes in seconds
+		"/",
+		"",
+		true,
+		false,
+	)
+
+	// Refresh token cookie - HTTP only, secure
+	ctx.SetCookie(
+		RefreshTokenCookie,
+		tokens.RefreshToken,
+		2592000, // 30 days in seconds
+		"/",
+		"",
+		true,
+		true,
+	)
 }

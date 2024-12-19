@@ -16,6 +16,8 @@ import (
 
 type KeycloakRepository interface {
 	Login(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*responses.AuthResponse, error)
+	ValidateToken(ctx context.Context, token string) (bool, error)
 	RegisterUser(ctx context.Context, req *requests.RegisterRequest) (*responses.CreateIdentityResponse, error)
 	GetUserInfo(ctx context.Context, token string) (*responses.UserResponse, error)
 	LoginWithPin(ctx context.Context, req *requests.PinLoginRequest) (*responses.AuthResponse, error)
@@ -61,6 +63,57 @@ func (r *keycloakRepository) Login(ctx context.Context, req *requests.LoginReque
 	}
 
 	return &authResponse, nil
+}
+
+func (r *keycloakRepository) RefreshToken(ctx context.Context, refreshToken string) (*responses.AuthResponse, error) {
+	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", r.config.BaseURL, r.config.Realm)
+
+	data := url.Values{}
+	data.Set("grant_type", "refresh_token")
+	data.Set("client_id", r.config.ClientID)
+	data.Set("client_secret", r.config.ClientSecret)
+	data.Set("refresh_token", refreshToken)
+
+	resp, err := r.makeRequest(ctx, "POST", tokenURL, data)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("token refresh failed: %d", resp.StatusCode)
+	}
+
+	var tokenResponse responses.AuthResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
+		return nil, err
+	}
+
+	return &tokenResponse, nil
+}
+
+func (r *keycloakRepository) ValidateToken(ctx context.Context, token string) (bool, error) {
+	introspectURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token/introspect", r.config.BaseURL, r.config.Realm)
+
+	data := url.Values{}
+	data.Set("token", token)
+	data.Set("client_id", r.config.ClientID)
+	data.Set("client_secret", r.config.ClientSecret)
+
+	resp, err := r.makeRequest(ctx, "POST", introspectURL, data)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Active bool `json:"active"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false, err
+	}
+
+	return result.Active, nil
 }
 
 func (r *keycloakRepository) RegisterUser(ctx context.Context, req *requests.RegisterRequest) (*responses.CreateIdentityResponse, error) {
