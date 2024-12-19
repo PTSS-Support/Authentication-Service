@@ -30,7 +30,6 @@ func LoadConfig() (*Config, error) {
 
 	viper.AutomaticEnv()
 
-	// TODO: place in .env file
 	viper.SetDefault("server.port", "8081")
 	viper.SetDefault("keycloak.baseURL", "http://localhost:8080")
 	viper.SetDefault("keycloak.realm", "master")

@@ -34,10 +34,32 @@ services:
         condition: service_healthy
     command: ["start-dev"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      test: [ "CMD", "/opt/keycloak/bin/kc.sh", "show-config" ]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 15s
+
+  init-keycloak:
+    image: alpine:latest
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ./keycloak-init.sh
+        target: /init.sh
+      - type: bind
+        source: ./.env
+        target: /.env
+    command: >
+      sh -c "
+        apk update &&
+        apk add --no-cache curl jq &&
+        dos2unix /init.sh 2>/dev/null || true &&
+        chmod +x /init.sh &&
+        sh /init.sh
+      "
 
 volumes:
   postgres_data:
