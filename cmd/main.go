@@ -19,10 +19,20 @@ func main() {
 	}
 
 	// Initialize dependencies
-	keycloakRepo := repositories.NewKeycloakRepository(&cfg.Keycloak)
-	authService := services.NewAuthService(keycloakRepo)
+	baseKeycloakRepo := repositories.NewBaseKeycloakRepository(&cfg.Keycloak)
+
+	// Auth
+	authRepo := repositories.NewAuthRepository(baseKeycloakRepo)
+	authService := services.NewAuthService(authRepo)
 	authFacade := facades.NewAuthFacade(authService)
 	authController := controllers.NewAuthController(authFacade)
+
+	// Identity
+	identityRepo := repositories.NewIdentityRepository(baseKeycloakRepo)
+	identityService := services.NewIdentityService(identityRepo)
+	encryptionService := services.NewEncryptionService()
+	identityFacade := facades.NewIdentityFacade(identityService, encryptionService)
+	identityController := controllers.NewIdentityController(identityFacade)
 
 	// Setup Gin in appropriate mode
 	if gin.Mode() == gin.ReleaseMode {
@@ -47,6 +57,7 @@ func main() {
 
 	// Register routes
 	authController.RegisterRoutes(r)
+	identityController.RegisterRoutes(r)
 
 	// Health check endpoint
 	r.GET("/health", func(c *gin.Context) {
