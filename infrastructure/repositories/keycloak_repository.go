@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -100,22 +101,34 @@ func (r *keycloakRepository) ValidateToken(ctx context.Context, token string) (b
 	data.Set("client_id", r.config.ClientID)
 	data.Set("client_secret", r.config.ClientSecret)
 
+	fmt.Printf("Validating token: %s\n", token[:10]) // Print first 10 chars of token
+	fmt.Printf("URL: %s\n", introspectURL)
+
 	resp, err := r.makeRequest(ctx, "POST", introspectURL, data)
 	if err != nil {
+		fmt.Printf("Request error: %v\n", err)
 		return false, err
 	}
 	defer resp.Body.Close()
+
+	// Read the response body for debugging
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	fmt.Printf("Response status: %d\n", resp.StatusCode)
+	fmt.Printf("Response body: %s\n", string(bodyBytes))
+
+	// Create new reader for the actual processing
+	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	var result struct {
 		Active bool `json:"active"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		fmt.Printf("Decode error: %v\n", err)
 		return false, err
 	}
 
 	return result.Active, nil
 }
-
 func (r *keycloakRepository) RegisterUser(ctx context.Context, req *requests.RegisterRequest) (*responses.CreateIdentityResponse, error) {
 	// First, get admin token
 	adminToken, err := r.getAdminToken(ctx)

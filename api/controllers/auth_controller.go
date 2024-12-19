@@ -76,7 +76,12 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response)
+	// Set cookies
+	setAuthCookies(ctx, response)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Login successful",
+	})
 }
 
 func (c *AuthController) GetUserInfo(ctx *gin.Context) {
@@ -103,7 +108,7 @@ func (c *AuthController) GetUserInfo(ctx *gin.Context) {
 }
 
 func (c *AuthController) ValidateTokens(ctx *gin.Context) {
-	accessToken := ctx.GetHeader("Authorization")
+	accessToken := strings.TrimPrefix(ctx.GetHeader("Authorization"), "Bearer ")
 	if accessToken == "" {
 		ctx.JSON(http.StatusUnauthorized, gin.H{
 			"error": "No access token provided",
