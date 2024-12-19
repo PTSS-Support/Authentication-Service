@@ -35,7 +35,7 @@ keycloak:
 
 4. Start keycloak server
 ```bash
-docker-compose up
+docker compose up
 ```
 
 5. Run the application
