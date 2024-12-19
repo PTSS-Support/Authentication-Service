@@ -1,19 +1,19 @@
 package entities
 
 import (
-	"time"
-
 	"github.com/PTSS-Support/identity-service/domain/enums"
 	"github.com/PTSS-Support/identity-service/domain/models"
 )
 
 // KeycloakIdentity represents the Keycloak user structure
 type KeycloakIdentity struct {
-	ID          string               `json:"id"`
-	CreatedAt   time.Time            `json:"createdTimestamp"`
-	Email       string               `json:"email"`
-	Attributes  map[string][]string  `json:"attributes"`
-	Credentials []KeycloakCredential `json:"credentials,omitempty"`
+	ID               string               `json:"id,omitempty"`
+	CreatedTimestamp int64                `json:"createdTimestamp,omitempty"`
+	Username         string               `json:"username"` // Required by Keycloak
+	Email            string               `json:"email"`
+	Enabled          bool                 `json:"enabled"` // Required by Keycloak
+	Attributes       map[string][]string  `json:"attributes"`
+	Credentials      []KeycloakCredential `json:"credentials,omitempty"`
 }
 
 // ToModel converts a KeycloakIdentity to a domain Identity model
@@ -57,7 +57,9 @@ func FromModel(model *models.Identity, hashedPassword string) *KeycloakIdentity 
 
 	return &KeycloakIdentity{
 		ID:          model.ID,
+		Username:    model.Email, // Use email as username
 		Email:       model.Email,
+		Enabled:     true, // Always enable users by default
 		Attributes:  attributes,
 		Credentials: credentials,
 	}

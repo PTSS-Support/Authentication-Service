@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
 	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/identity"
@@ -10,6 +11,7 @@ import (
 	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/domain/models"
 	"github.com/PTSS-Support/identity-service/infrastructure/repositories"
+	"github.com/PTSS-Support/identity-service/infrastructure/util"
 )
 
 type IdentityService interface {
@@ -24,15 +26,20 @@ type IdentityService interface {
 
 type identityService struct {
 	identityRepo repositories.IdentityRepository
+	logger       util.Logger
 }
 
 func NewIdentityService(identityRepo repositories.IdentityRepository) IdentityService {
 	return &identityService{
 		identityRepo: identityRepo,
+		logger:       util.NewLogger("IdentityService"),
 	}
 }
 
 func (s *identityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword, hashedPIN string) (*responses.IdentityResponse, error) {
+	log := s.logger.WithContext(ctx)
+	log.Info("Creating new identity", "email", req.Email, "role", req.Role)
+
 	// Create domain model
 	identity := &models.Identity{
 		Email: req.Email,
@@ -41,29 +48,38 @@ func (s *identityService) CreateIdentity(ctx context.Context, req *requests.Crea
 
 	if req.PIN != "" {
 		identity.PIN = &hashedPIN
+		log.Debug("PIN provided, using hashed value")
 	}
 
 	// Convert to Keycloak entity
 	keycloakIdentity := entities.FromModel(identity, hashedPassword)
+	log.Debug("Converted to Keycloak entity", "username", keycloakIdentity.Email)
 
 	// Create identity in repository
 	createdIdentity, err := s.identityRepo.CreateIdentity(ctx, keycloakIdentity)
 	if err != nil {
-		return nil, err
+		log.Error("Failed to create identity in repository", "error", err)
+		return nil, fmt.Errorf("failed to create identity: %w", err)
 	}
+
+	log.Debug("Successfully created identity in Keycloak", "id", createdIdentity.ID)
 
 	// Extract role from attributes
 	var role enums.Role
 	if roleValues, exists := createdIdentity.Attributes["role"]; exists && len(roleValues) > 0 {
 		role = enums.Role(roleValues[0])
+		log.Debug("Extracted role from attributes", "role", role)
 	}
 
 	// Convert to response
-	return &responses.IdentityResponse{
+	response := &responses.IdentityResponse{
 		ID:    createdIdentity.ID,
 		Email: createdIdentity.Email,
 		Role:  role,
-	}, nil
+	}
+	log.Info("Successfully created identity", "id", response.ID, "email", response.Email)
+
+	return response, nil
 }
 
 func (s *identityService) UpdateRole(ctx context.Context, id string, req *requests.UpdateRoleRequest) (*responses.IdentityResponse, error) {

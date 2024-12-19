@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
 	"github.com/PTSS-Support/identity-service/domain/entities"
+	"github.com/PTSS-Support/identity-service/infrastructure/util"
 )
 
 type IdentityRepository interface {
@@ -19,21 +21,29 @@ type IdentityRepository interface {
 
 type identityRepository struct {
 	*BaseKeycloakRepository
+	logger util.Logger
 }
 
 func NewIdentityRepository(keycloak *BaseKeycloakRepository) IdentityRepository {
 	return &identityRepository{
 		BaseKeycloakRepository: keycloak,
+		logger:                 util.NewLogger("IdentityRepository"),
 	}
 }
 
 func (r *identityRepository) CreateIdentity(ctx context.Context, identity *entities.KeycloakIdentity) (*entities.KeycloakIdentity, error) {
+	log := r.logger.WithContext(ctx)
+	log.Info("Starting Keycloak identity creation", "email", identity.Email)
+
 	_, err := r.getAdminToken(ctx)
 	if err != nil {
-		return nil, err
+		log.Error("Failed to get admin token", "error", err)
+		return nil, fmt.Errorf("failed to get admin token: %w", err)
 	}
+	log.Debug("Successfully obtained admin token")
 
 	usersURL := fmt.Sprintf("%s/admin/realms/%s/users", r.config.BaseURL, r.config.Realm)
+	log.Debug("Making request to Keycloak", "url", usersURL)
 
 	// Create request body directly from KeycloakIdentity
 	createReq := map[string]interface{}{
@@ -46,72 +56,81 @@ func (r *identityRepository) CreateIdentity(ctx context.Context, identity *entit
 
 	resp, err := r.makeJSONRequest(ctx, "POST", usersURL, createReq)
 	if err != nil {
-		return nil, err
+		log.Error("Failed to make request to Keycloak", "error", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
+		// Read response body for more details
+		body, _ := io.ReadAll(resp.Body)
+		log.Error("Received non-201 status from Keycloak",
+			"statusCode", resp.StatusCode,
+			"body", string(body),
+			"headers", resp.Header)
 		return nil, fmt.Errorf("failed to create user: %d", resp.StatusCode)
 	}
 
 	// Get the created user's ID from Location header
-	userID := resp.Header.Get("Location")
-	// Extract actual ID from the URL
-	userID = userID[strings.LastIndex(userID, "/")+1:]
+	location := resp.Header.Get("Location")
+	log.Debug("Got Location header", "location", location)
+
+	userID := location[strings.LastIndex(location, "/")+1:]
+	log.Info("Successfully created user in Keycloak", "id", userID)
 
 	// Retrieve the created identity
 	return r.GetIdentity(ctx, userID)
 }
 
 func (r *identityRepository) GetIdentity(ctx context.Context, id string) (*entities.KeycloakIdentity, error) {
-	adminToken, err := r.getAdminToken(ctx)
+	log := r.logger.WithContext(ctx)
+	log.Debug("Getting identity from Keycloak", "id", id)
+
+	token, err := r.getAdminToken(ctx)
 	if err != nil {
+		log.Error("Failed to get admin token", "error", err)
 		return nil, err
 	}
 
 	userURL := fmt.Sprintf("%s/admin/realms/%s/users/%s", r.config.BaseURL, r.config.Realm, id)
-
 	req, err := http.NewRequestWithContext(ctx, "GET", userURL, nil)
 	if err != nil {
+		log.Error("Failed to create request", "error", err)
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
+		log.Error("Failed to get user", "error", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Error("Failed to get user",
+			"statusCode", resp.StatusCode,
+			"response", string(body))
 		return nil, fmt.Errorf("failed to get user: %d", resp.StatusCode)
 	}
 
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Error("Failed to read response body", "error", err)
+		return nil, err
+	}
+
+	log.Debug("Received user data", "response", string(body))
+
 	var identity entities.KeycloakIdentity
-	if err := json.NewDecoder(resp.Body).Decode(&identity); err != nil {
+	if err := json.Unmarshal(body, &identity); err != nil {
+		log.Error("Failed to unmarshal user data",
+			"error", err,
+			"response", string(body))
 		return nil, err
-	}
-
-	// Get user credentials separately as they're not included in the main user endpoint
-	credentialsURL := fmt.Sprintf("%s/credentials", userURL)
-	req, err = http.NewRequestWithContext(ctx, "GET", credentialsURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+adminToken)
-
-	resp, err = r.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK {
-		if err := json.NewDecoder(resp.Body).Decode(&identity.Credentials); err != nil {
-			return nil, err
-		}
 	}
 
 	return &identity, nil
