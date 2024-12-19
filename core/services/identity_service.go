@@ -15,7 +15,7 @@ import (
 )
 
 type IdentityService interface {
-	CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword, hashedPIN string) (*responses.IdentityResponse, error)
+	CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword string) (*responses.IdentityResponse, error)
 	UpdateRole(ctx context.Context, id string, req *requests.UpdateRoleRequest) (*responses.IdentityResponse, error)
 	DeleteIdentity(ctx context.Context, id string) error
 	GetCurrentPasswordHash(ctx context.Context, id string) (string, error)
@@ -36,7 +36,7 @@ func NewIdentityService(identityRepo repositories.IdentityRepository) IdentitySe
 	}
 }
 
-func (s *identityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword, hashedPIN string) (*responses.IdentityResponse, error) {
+func (s *identityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword string) (*responses.IdentityResponse, error) {
 	log := s.logger.WithContext(ctx)
 	log.Info("Creating new identity", "email", req.Email, "role", req.Role)
 
@@ -44,11 +44,6 @@ func (s *identityService) CreateIdentity(ctx context.Context, req *requests.Crea
 	identity := &models.Identity{
 		Email: req.Email,
 		Role:  req.Role,
-	}
-
-	if req.PIN != "" {
-		identity.PIN = &hashedPIN
-		log.Debug("PIN provided, using hashed value")
 	}
 
 	// Convert to Keycloak entity

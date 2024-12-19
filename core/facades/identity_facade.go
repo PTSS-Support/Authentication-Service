@@ -44,18 +44,8 @@ func (f *identityFacade) HandleIdentityCreation(ctx context.Context, req *reques
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Hash the PIN if provided
-	var hashedPIN string
-	if req.PIN != "" {
-		hashedPIN, err = f.encryptionService.HashPIN(req.PIN)
-		if err != nil {
-			log.Error("Failed to hash PIN", "error", err)
-			return nil, fmt.Errorf("failed to hash PIN: %w", err)
-		}
-	}
-
 	// Create identity with hashed credentials
-	response, err := f.identityService.CreateIdentity(ctx, req, hashedPassword, hashedPIN)
+	response, err := f.identityService.CreateIdentity(ctx, req, hashedPassword)
 	if err != nil {
 		log.Error("Failed to create identity", "error", err, "email", req.Email)
 		return nil, fmt.Errorf("failed to create user: %w", err)
