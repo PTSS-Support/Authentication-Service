@@ -20,6 +20,7 @@ type IdentityService interface {
 	DeleteIdentity(ctx context.Context, id string) error
 	GetCurrentPasswordHash(ctx context.Context, id string) (string, error)
 	GetCurrentPINHash(ctx context.Context, id string) (string, error)
+	VerifyPassword(ctx context.Context, id string, password string) error
 	UpdatePassword(ctx context.Context, id string, hashedPassword string) error
 	UpdatePIN(ctx context.Context, id string, hashedPIN string) error
 }
@@ -143,25 +144,17 @@ func (s *identityService) GetCurrentPINHash(ctx context.Context, id string) (str
 	return "", errors.ErrInvalidCredentials
 }
 
-func (s *identityService) UpdatePassword(ctx context.Context, id string, hashedPassword string) error {
-	// Get current identity
+func (s *identityService) VerifyPassword(ctx context.Context, id string, password string) error {
 	identity, err := s.identityRepo.GetIdentity(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	// Update password credential
-	identity.Credentials = []entities.KeycloakCredential{
-		{
-			Type:      "password",
-			Value:     hashedPassword,
-			Temporary: false,
-		},
-	}
+	return s.identityRepo.VerifyPassword(ctx, identity.Email, password)
+}
 
-	// Update in repository
-	_, err = s.identityRepo.UpdateIdentity(ctx, identity)
-	return err
+func (s *identityService) UpdatePassword(ctx context.Context, id string, newPassword string) error {
+	return s.identityRepo.UpdatePassword(ctx, id, newPassword)
 }
 
 func (s *identityService) UpdatePIN(ctx context.Context, id string, hashedPIN string) error {

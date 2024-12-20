@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/PTSS-Support/identity-service/domain/entities"
+	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
 )
 
@@ -17,6 +19,8 @@ type IdentityRepository interface {
 	GetIdentity(ctx context.Context, id string) (*entities.KeycloakIdentity, error)
 	UpdateIdentity(ctx context.Context, identity *entities.KeycloakIdentity) (*entities.KeycloakIdentity, error)
 	DeleteIdentity(ctx context.Context, id string) error
+	VerifyPassword(ctx context.Context, username string, password string) error
+	UpdatePassword(ctx context.Context, id string, newPassword string) error
 }
 
 type identityRepository struct {
@@ -45,13 +49,25 @@ func (r *identityRepository) CreateIdentity(ctx context.Context, identity *entit
 	usersURL := fmt.Sprintf("%s/admin/realms/%s/users", r.config.BaseURL, r.config.Realm)
 	log.Debug("Making request to Keycloak", "url", usersURL)
 
-	// Create request body directly from KeycloakIdentity
+	// Get the raw password from credentials
+	rawPassword := ""
+	if len(identity.Credentials) > 0 {
+		rawPassword = identity.Credentials[0].Value
+	}
+
+	// Create request body with raw password
 	createReq := map[string]interface{}{
-		"username":    identity.Email,
-		"email":       identity.Email,
-		"enabled":     true,
-		"attributes":  identity.Attributes,
-		"credentials": identity.Credentials,
+		"username":   identity.Email,
+		"email":      identity.Email,
+		"enabled":    true,
+		"attributes": identity.Attributes,
+		"credentials": []map[string]interface{}{
+			{
+				"type":      "password",
+				"value":     rawPassword, // Send raw password, not hashed
+				"temporary": false,
+			},
+		},
 	}
 
 	resp, err := r.makeJSONRequest(ctx, "POST", usersURL, createReq)
@@ -209,6 +225,78 @@ func (r *identityRepository) DeleteIdentity(ctx context.Context, id string) erro
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("failed to delete user: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func (r *identityRepository) VerifyPassword(ctx context.Context, username string, password string) error {
+	log := r.logger.WithContext(ctx)
+
+	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", r.config.BaseURL, r.config.Realm)
+
+	data := url.Values{}
+	data.Set("grant_type", "password")
+	data.Set("client_id", r.config.ClientID)
+	data.Set("client_secret", r.config.ClientSecret)
+	data.Set("username", username)
+	data.Set("password", password)
+
+	log.Debug("Verifying password",
+		"username", username,
+		"tokenURL", tokenURL,
+		"clientId", r.config.ClientID)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		log.Error("Failed to create request", "error", err)
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Error("Failed to verify password", "error", err)
+		return errors.ErrInvalidCredentials
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Error("Invalid credentials",
+			"statusCode", resp.StatusCode,
+			"response", string(body))
+		return errors.ErrInvalidCredentials
+	}
+
+	return nil
+}
+
+func (r *identityRepository) UpdatePassword(ctx context.Context, id string, newPassword string) error {
+	log := r.logger.WithContext(ctx)
+
+	resetURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/reset-password", r.config.BaseURL, r.config.Realm, id)
+
+	resetData := map[string]interface{}{
+		"type":      "password",
+		"value":     newPassword,
+		"temporary": false,
+	}
+
+	resp, err := r.makeJSONRequest(ctx, "PUT", resetURL, resetData)
+	if err != nil {
+		log.Error("Failed to update password", "error", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		log.Error("Failed to update password",
+			"statusCode", resp.StatusCode,
+			"response", string(body))
+		return fmt.Errorf("failed to update password: %d", resp.StatusCode)
 	}
 
 	return nil

@@ -28,7 +28,13 @@ server:
 keycloak:
   baseURL: "http://localhost:8080"
   realm: "master"         
-  clientID: "admin-cli"
+  # For admin operations
+  adminClientID: "admin-cli"
+  adminUsername: "admin"
+  adminPassword: "admin"
+  # For user operations
+  clientID: "identity-service"
+  clientSecret: "your-client-secret" # See step 5
   adminUsername: "admin"
   adminPassword: "admin"
 ```
@@ -38,12 +44,24 @@ keycloak:
 docker compose up
 ```
 
-5. Run the application
+5. Configure Keycloak
+   Follow the [Keycloak Setup Guide](docs/KEYCLOAK_SETUP_GUIDE.md) to:
+   - Create a custom realm
+   - Configure the required client
+   - Set up proper authentication flows
+   
+   This is a crucial step for the service to work correctly.
+
+6. Run the application
 ```bash
 go run cmd/main.go
 ```
 
 ## API Testing
+
+> [!CAUTION]
+> Need to be adjusted!
+
 1. Create a new user
 ```bash
 curl -X POST http://localhost:8081/auth/register \
@@ -65,7 +83,7 @@ curl -X POST http://localhost:8081/auth/login \
     "password": "password123"
   }'
 ```
-3. get user info
+3. Get user info
 ```bash
 # Replace TOKEN with the access token from login response
 curl -X GET http://localhost:8081/auth/me \

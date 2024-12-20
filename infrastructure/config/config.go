@@ -14,12 +14,15 @@ type ServerConfig struct {
 }
 
 type KeycloakConfig struct {
-	BaseURL       string
-	Realm         string
-	ClientID      string
-	ClientSecret  string
-	AdminUsername string
-	AdminPassword string
+	BaseURL string `yaml:"baseURL"`
+	Realm   string `yaml:"realm"`
+	// Admin client config
+	AdminClientID string `yaml:"adminClientID"`
+	AdminUsername string `yaml:"adminUsername"`
+	AdminPassword string `yaml:"adminPassword"`
+	// User operations client config
+	ClientID     string `yaml:"clientID"`
+	ClientSecret string `yaml:"clientSecret"`
 }
 
 func LoadConfig() (*Config, error) {

@@ -62,16 +62,11 @@ func (r *BaseKeycloakRepository) makeRequest(ctx context.Context, method, url st
 // getAdminToken retrieves an admin token from Keycloak
 func (r *BaseKeycloakRepository) getAdminToken(ctx context.Context) (string, error) {
 	log := r.logger.WithContext(ctx)
-	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", r.config.BaseURL, r.config.Realm)
-	log.Debug("Getting admin token",
-		"url", tokenURL,
-		"clientId", r.config.ClientID,
-		"username", r.config.AdminUsername)
+	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", r.config.BaseURL, "master")
 
 	data := url.Values{}
 	data.Set("grant_type", "password")
-	data.Set("client_id", r.config.ClientID)
-	data.Set("client_secret", r.config.ClientSecret)
+	data.Set("client_id", r.config.AdminClientID)
 	data.Set("username", r.config.AdminUsername)
 	data.Set("password", r.config.AdminPassword)
 
