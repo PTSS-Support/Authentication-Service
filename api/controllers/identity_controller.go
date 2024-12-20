@@ -9,6 +9,7 @@ import (
 )
 
 type IdentityController struct {
+	BaseController
 	identityFacade facades.IdentityFacade
 }
 
@@ -22,8 +23,8 @@ func (c *IdentityController) RegisterRoutes(r *gin.Engine) {
 	identity := r.Group("/auth/identity")
 	{
 		identity.POST("", c.CreateIdentity)
-		identity.PATCH("/:id", c.UpdateRole)
 		identity.DELETE("/:id", c.DeleteIdentity)
+		identity.PATCH("/:id/role", c.UpdateRole)
 		identity.PATCH("/:id/password", c.UpdatePassword)
 		identity.PATCH("/:id/pin", c.UpdatePIN)
 	}
@@ -53,6 +54,10 @@ func (c *IdentityController) CreateIdentity(ctx *gin.Context) {
 
 func (c *IdentityController) UpdateRole(ctx *gin.Context) {
 	id := ctx.Param("id")
+	if !c.validateUUID(ctx, id) {
+		return
+	}
+
 	var req requests.UpdateRoleRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -76,6 +81,10 @@ func (c *IdentityController) UpdateRole(ctx *gin.Context) {
 
 func (c *IdentityController) DeleteIdentity(ctx *gin.Context) {
 	id := ctx.Param("id")
+	if !c.validateUUID(ctx, id) {
+		return
+	}
+
 	err := c.identityFacade.HandleIdentityDeletion(ctx.Request.Context(), id)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -90,6 +99,10 @@ func (c *IdentityController) DeleteIdentity(ctx *gin.Context) {
 
 func (c *IdentityController) UpdatePassword(ctx *gin.Context) {
 	id := ctx.Param("id")
+	if !c.validateUUID(ctx, id) {
+		return
+	}
+
 	var req requests.UpdatePasswordRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -113,6 +126,10 @@ func (c *IdentityController) UpdatePassword(ctx *gin.Context) {
 
 func (c *IdentityController) UpdatePIN(ctx *gin.Context) {
 	id := ctx.Param("id")
+	if !c.validateUUID(ctx, id) {
+		return
+	}
+
 	var req requests.UpdatePINRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
