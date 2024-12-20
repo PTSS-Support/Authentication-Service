@@ -59,7 +59,6 @@ func (r *BaseKeycloakRepository) makeRequest(ctx context.Context, method, url st
 	return resp, nil
 }
 
-// getAdminToken retrieves an admin token from Keycloak
 func (r *BaseKeycloakRepository) getAdminToken(ctx context.Context) (string, error) {
 	log := r.logger.WithContext(ctx)
 	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", r.config.BaseURL, "master")
@@ -105,7 +104,6 @@ func (r *BaseKeycloakRepository) getAdminToken(ctx context.Context) (string, err
 	return result.AccessToken, nil
 }
 
-// makeJSONRequest is a helper method for making HTTP requests with JSON body
 func (r *BaseKeycloakRepository) makeJSONRequest(ctx context.Context, method, url string, body interface{}) (*http.Response, error) {
 	log := r.logger.WithContext(ctx)
 	log.Debug("Making JSON request",

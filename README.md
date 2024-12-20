@@ -18,26 +18,9 @@ cd authentication-service
 ```bash
 go mod tidy
 ```
-3. Create a config file
+3. Configure Environment Variables
 
-for local development, create a `config.yaml` file in the root directory of the project with the following content:
-```yaml
-server:
-  port: "8081"
-
-keycloak:
-  baseURL: "http://localhost:8080"
-  realm: "master"         
-  # For admin operations
-  adminClientID: "admin-cli"
-  adminUsername: "admin"
-  adminPassword: "admin"
-  # For user operations
-  clientID: "identity-service"
-  clientSecret: "your-client-secret" # See step 5
-  adminUsername: "admin"
-  adminPassword: "admin"
-```
+For local development, create a `.env` file in the root directory of the project. You can use the provided [`.env.example`](./.env.example) as a template.
 
 4. Start keycloak server
 ```bash
