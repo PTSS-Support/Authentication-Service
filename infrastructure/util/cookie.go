@@ -53,25 +53,3 @@ func GetRefreshTokenFromCookie(ctx *gin.Context) (string, error) {
 
 	return token, nil
 }
-
-func ClearAuthCookies(ctx *gin.Context) {
-	ctx.SetCookie(
-		constants.AccessTokenCookie,
-		"",
-		-1,
-		constants.CookiePathRoot,
-		"",
-		true,
-		true,
-	)
-
-	ctx.SetCookie(
-		constants.RefreshTokenCookie,
-		"",
-		-1,
-		constants.CookiePathAuth,
-		"",
-		true,
-		true,
-	)
-}
