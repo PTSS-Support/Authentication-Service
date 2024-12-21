@@ -154,6 +154,7 @@ func (r *authRepository) prepareLoginData(email, password string) url.Values {
 	data.Set("client_secret", r.config.ClientSecret)
 	data.Set("username", email)
 	data.Set("password", password)
+	data.Set("scope", "openid")
 	return data
 }
 
