@@ -64,6 +64,10 @@ func (r *authRepository) ValidateAccessToken(ctx context.Context, token string) 
 	userinfoURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/userinfo",
 		r.config.BaseURL, r.config.Realm)
 
+	log.Debug("Validating access token",
+		"url", userinfoURL,
+		"token_length", len(token))
+
 	req, err := http.NewRequestWithContext(ctx, "GET", userinfoURL, nil)
 	if err != nil {
 		log.Error("Failed to create userinfo request", "error", err)
@@ -72,6 +76,9 @@ func (r *authRepository) ValidateAccessToken(ctx context.Context, token string) 
 
 	req.Header.Set("Authorization", "Bearer "+token)
 
+	log.Debug("Sending userinfo request with headers",
+		"headers", req.Header)
+
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
 		log.Error("Userinfo request failed", "error", err)
@@ -79,20 +86,28 @@ func (r *authRepository) ValidateAccessToken(ctx context.Context, token string) 
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
+	log.Debug("Received userinfo response",
+		"statusCode", resp.StatusCode,
+		"body", string(body),
+		"headers", resp.Header)
+
 	if resp.StatusCode != http.StatusOK {
-		// only bad requests should be expected here
-		// see https://www.keycloak.org/securing-apps/token-exchange under 'Making the request'
 		if resp.StatusCode == http.StatusBadRequest {
+			log.Debug("Received BadRequest response", "body", string(body))
 			return r.handleKeycloakError(resp)
 		}
-		// if completely invalid, unauthorised is returned
-		if resp.StatusCode == http.StatusUnauthorized {
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			log.Debug("Received Unauthorized/Forbidden response", "body", string(body))
 			return errors.ErrInvalidToken
 		}
-		log.Error("Unexpected response", "response", resp)
+		log.Error("Unexpected response",
+			"statusCode", resp.StatusCode,
+			"body", string(body))
 		return errors.ErrInvalidResponse
 	}
 
+	log.Debug("Access token validated successfully")
 	return nil
 }
 

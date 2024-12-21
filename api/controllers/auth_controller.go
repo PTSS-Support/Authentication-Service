@@ -4,6 +4,7 @@ import (
 	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"net/http"
+	"strings"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
 	"github.com/PTSS-Support/identity-service/core/facades"
@@ -48,22 +49,24 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
-	util.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
+	util.SetRefreshTokenCookie(ctx, response.RefreshToken)
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Login successful",
+		"message":      "Login successful",
+		"access_token": response.AccessToken,
 	})
 }
 
 func (c *AuthController) ValidateTokens(ctx *gin.Context) {
-	accessToken, err := util.GetAccessTokenFromCookie(ctx)
-	if err != nil {
+	authHeader := ctx.GetHeader("Authorization")
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Missing access token",
-			"details": err.Error(),
+			"details": "Authorization header is missing or invalid",
 		})
 		return
 	}
+	accessToken := strings.TrimPrefix(authHeader, "Bearer ")
 
 	refreshToken, err := util.GetRefreshTokenFromCookie(ctx)
 	if err != nil {
@@ -94,9 +97,12 @@ func (c *AuthController) ValidateTokens(ctx *gin.Context) {
 		return
 	}
 
-	// If response is nil, tokens are valid and don't need refresh
 	if response != nil {
-		util.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
+		util.SetRefreshTokenCookie(ctx, response.RefreshToken)
+		ctx.JSON(http.StatusOK, gin.H{
+			"access_token": response.AccessToken,
+		})
+		return
 	}
 
 	ctx.Status(http.StatusNoContent)

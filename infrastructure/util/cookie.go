@@ -7,17 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetAuthCookies(ctx *gin.Context, accessToken, refreshToken string) {
-	ctx.SetCookie(
-		constants.AccessTokenCookie,
-		accessToken,
-		constants.AccessTokenDuration,
-		constants.CookiePathRoot,
-		"",   // empty domain = current domain
-		true, // secure
-		true, // httpOnly
-	)
-
+func SetRefreshTokenCookie(ctx *gin.Context, refreshToken string) {
 	ctx.SetCookie(
 		constants.RefreshTokenCookie,
 		refreshToken,
@@ -27,18 +17,6 @@ func SetAuthCookies(ctx *gin.Context, accessToken, refreshToken string) {
 		true,
 		true,
 	)
-}
-func GetAccessTokenFromCookie(ctx *gin.Context) (string, error) {
-	token, err := ctx.Cookie(constants.AccessTokenCookie)
-	if err != nil {
-		return "", fmt.Errorf("%w: %v", errors.ErrMissingToken, err)
-	}
-
-	if token == "" {
-		return "", errors.ErrMissingToken
-	}
-
-	return token, nil
 }
 
 func GetRefreshTokenFromCookie(ctx *gin.Context) (string, error) {
