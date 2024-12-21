@@ -1,0 +1,21 @@
+_id: req_c9fab55b0ded45cdb349b8e8fb5002eb
+type: Request
+parentId: wrk_4cf4fa1c368341d696877c3618b005f3
+modified: 1734612628430
+created: 1734612353162
+url: "{{url}}/auth/identity/{{id}}"
+name: New Request
+description: ""
+method: DELETE
+body: {}
+parameters: []
+headers: []
+authentication: {}
+metaSortKey: -1734612353162
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

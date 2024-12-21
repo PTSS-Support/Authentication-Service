@@ -1,0 +1,29 @@
+_id: req_883f002d5454448684864778b4be6226
+type: Request
+parentId: wrk_4cf4fa1c368341d696877c3618b005f3
+modified: 1734612712308
+created: 1734612369744
+url: "{{url}}/auth/identity/{{id}}/pin"
+name: New Request
+description: ""
+method: PATCH
+body:
+  mimeType: application/json
+  text: |-
+    {
+        "oldPIN": "1234",
+        "newPIN": "5678"
+    }
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication: {}
+metaSortKey: -1734612369744
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

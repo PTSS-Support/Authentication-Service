@@ -15,13 +15,14 @@ import (
 )
 
 type IdentityService interface {
-	CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword, hashedPIN string) (*responses.IdentityResponse, error)
+	CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword string) (*responses.IdentityResponse, error)
 	UpdateRole(ctx context.Context, id string, req *requests.UpdateRoleRequest) (*responses.IdentityResponse, error)
 	DeleteIdentity(ctx context.Context, id string) error
-	GetCurrentPasswordHash(ctx context.Context, id string) (string, error)
+	VerifyPassword(ctx context.Context, id string, password string) error
+	UpdatePassword(ctx context.Context, id string, newPassword string) error
 	GetCurrentPINHash(ctx context.Context, id string) (string, error)
-	UpdatePassword(ctx context.Context, id string, hashedPassword string) error
 	UpdatePIN(ctx context.Context, id string, hashedPIN string) error
+	SetPIN(ctx context.Context, id string, hashedPIN string) error
 }
 
 type identityService struct {
@@ -36,7 +37,7 @@ func NewIdentityService(identityRepo repositories.IdentityRepository) IdentitySe
 	}
 }
 
-func (s *identityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword, hashedPIN string) (*responses.IdentityResponse, error) {
+func (s *identityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword string) (*responses.IdentityResponse, error) {
 	log := s.logger.WithContext(ctx)
 	log.Info("Creating new identity", "email", req.Email, "role", req.Role)
 
@@ -44,11 +45,6 @@ func (s *identityService) CreateIdentity(ctx context.Context, req *requests.Crea
 	identity := &models.Identity{
 		Email: req.Email,
 		Role:  req.Role,
-	}
-
-	if req.PIN != "" {
-		identity.PIN = &hashedPIN
-		log.Debug("PIN provided, using hashed value")
 	}
 
 	// Convert to Keycloak entity
@@ -116,27 +112,13 @@ func (s *identityService) DeleteIdentity(ctx context.Context, id string) error {
 	return s.identityRepo.DeleteIdentity(ctx, id)
 }
 
-func (s *identityService) GetCurrentPasswordHash(ctx context.Context, id string) (string, error) {
-	// Get identity from repository
-	identity, err := s.identityRepo.GetIdentity(ctx, id)
-	if err != nil {
-		return "", err
-	}
-
-	// Find password credential
-	for _, cred := range identity.Credentials {
-		if cred.Type == "password" {
-			return cred.Value, nil
-		}
-	}
-
-	return "", errors.ErrInvalidCredentials
-}
-
 func (s *identityService) GetCurrentPINHash(ctx context.Context, id string) (string, error) {
+	log := s.logger.WithContext(ctx)
+
 	// Get identity from repository
 	identity, err := s.identityRepo.GetIdentity(ctx, id)
 	if err != nil {
+		log.Error("Failed to get identity", "error", err)
 		return "", err
 	}
 
@@ -145,38 +127,62 @@ func (s *identityService) GetCurrentPINHash(ctx context.Context, id string) (str
 		return pinValues[0], nil
 	}
 
-	return "", errors.ErrInvalidCredentials
+	return "", nil // Return empty string if no PIN set
 }
 
-func (s *identityService) UpdatePassword(ctx context.Context, id string, hashedPassword string) error {
-	// Get current identity
+func (s *identityService) VerifyPassword(ctx context.Context, id string, password string) error {
 	identity, err := s.identityRepo.GetIdentity(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	// Update password credential
-	identity.Credentials = []entities.KeycloakCredential{
-		{
-			Type:      "password",
-			Value:     hashedPassword,
-			Temporary: false,
-		},
-	}
+	return s.identityRepo.VerifyPassword(ctx, identity.Email, password)
+}
 
-	// Update in repository
-	_, err = s.identityRepo.UpdateIdentity(ctx, identity)
-	return err
+func (s *identityService) UpdatePassword(ctx context.Context, id string, newPassword string) error {
+	return s.identityRepo.UpdatePassword(ctx, id, newPassword)
 }
 
 func (s *identityService) UpdatePIN(ctx context.Context, id string, hashedPIN string) error {
+	log := s.logger.WithContext(ctx)
+
 	// Get current identity
 	identity, err := s.identityRepo.GetIdentity(ctx, id)
 	if err != nil {
+		log.Error("Failed to get identity", "error", err)
 		return err
 	}
 
 	// Update PIN in attributes
+	if identity.Attributes == nil {
+		identity.Attributes = make(map[string][]string)
+	}
+	identity.Attributes["pin"] = []string{hashedPIN}
+
+	// Update in repository
+	log.Debug("Updating PIN in Keycloak")
+	_, err = s.identityRepo.UpdateIdentity(ctx, identity)
+	if err != nil {
+		log.Error("Failed to update identity", "error", err)
+		return fmt.Errorf("failed to update PIN in repository: %w", err)
+	}
+
+	return nil
+}
+
+func (s *identityService) SetPIN(ctx context.Context, id string, hashedPIN string) error {
+	// Get current identity
+	identity, err := s.identityRepo.GetIdentity(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Check if PIN already exists in attributes
+	if pinValues, exists := identity.Attributes["pin"]; exists && len(pinValues) > 0 {
+		return errors.ErrPINAlreadyExists
+	}
+
+	// Set PIN in attributes
 	identity.Attributes["pin"] = []string{hashedPIN}
 
 	// Update in repository

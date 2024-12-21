@@ -18,6 +18,7 @@ type KeycloakConfig struct {
 	Realm         string
 	ClientID      string
 	ClientSecret  string
+	AdminClientID string
 	AdminUsername string
 	AdminPassword string
 }
@@ -25,15 +26,15 @@ type KeycloakConfig struct {
 func LoadConfig() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-
-	// Add multiple possible config locations
 	viper.AddConfigPath(".")
-	viper.AddConfigPath("../")
-	viper.AddConfigPath("../../")
 	viper.AddConfigPath("./config")
-	viper.AddConfigPath("$HOME/.appname")
 
 	viper.AutomaticEnv()
+
+	// TODO: place in .env file
+	viper.SetDefault("server.port", "8081")
+	viper.SetDefault("keycloak.baseURL", "http://localhost:8080")
+	viper.SetDefault("keycloak.realm", "master")
 
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err

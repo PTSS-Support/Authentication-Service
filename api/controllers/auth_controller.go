@@ -10,6 +10,7 @@ import (
 )
 
 type AuthController struct {
+	BaseController
 	authFacade facades.AuthFacade
 }
 

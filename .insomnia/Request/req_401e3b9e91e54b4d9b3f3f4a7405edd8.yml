@@ -1,0 +1,31 @@
+_id: req_401e3b9e91e54b4d9b3f3f4a7405edd8
+type: Request
+parentId: wrk_4cf4fa1c368341d696877c3618b005f3
+modified: 1734612730946
+created: 1734612380612
+url: "{{url}}/auth/identity"
+name: New Request
+description: ""
+method: POST
+body:
+  mimeType: application/json
+  text: |-
+    {
+        "email": "testuser@gmail.com",
+        "password": "SecurePass123!",
+        "pin": "1234",
+        "role": "patient"
+    }
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication: {}
+metaSortKey: -1734612380612
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global
