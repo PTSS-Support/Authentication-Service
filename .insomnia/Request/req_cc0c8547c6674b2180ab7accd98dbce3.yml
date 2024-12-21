@@ -1,0 +1,29 @@
+_id: req_cc0c8547c6674b2180ab7accd98dbce3
+type: Request
+parentId: wrk_4cf4fa1c368341d696877c3618b005f3
+modified: 1734722336819
+created: 1734612378641
+url: "{{url}}/auth/identity/{{id}}/password"
+name: New Request
+description: ""
+method: PATCH
+body:
+  mimeType: application/json
+  text: |-
+    {
+        "oldPassword": "SecurePass123!",
+        "newPassword": "NewSecurePass456!"
+    }
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication: {}
+metaSortKey: -1734612378641
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

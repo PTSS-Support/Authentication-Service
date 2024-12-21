@@ -18,32 +18,33 @@ cd authentication-service
 ```bash
 go mod tidy
 ```
-3. Create a config file
+3. Configure Environment Variables
 
-for local development, create a `config.yaml` file in the root directory of the project with the following content:
-```yaml
-server:
-  port: "8081"
-
-keycloak:
-  baseURL: "http://localhost:8080"
-  realm: "master"         
-  clientID: "admin-cli"
-  adminUsername: "admin"
-  adminPassword: "admin"
-```
+For local development, create a `.env` file in the root directory of the project. You can use the provided [`.env.example`](./.env.example) as a template.
 
 4. Start keycloak server
 ```bash
-docker-compose up
+docker compose up
 ```
 
-5. Run the application
+5. Configure Keycloak
+   Follow the [Keycloak Setup Guide](docs/KEYCLOAK_SETUP_GUIDE.md) to:
+   - Create a custom realm
+   - Configure the required client
+   - Set up proper authentication flows
+   
+   This is a crucial step for the service to work correctly.
+
+6. Run the application
 ```bash
 go run cmd/main.go
 ```
 
 ## API Testing
+
+> [!CAUTION]
+> Need to be adjusted!
+
 1. Create a new user
 ```bash
 curl -X POST http://localhost:8081/auth/register \
@@ -65,7 +66,7 @@ curl -X POST http://localhost:8081/auth/login \
     "password": "password123"
   }'
 ```
-3. get user info
+3. Get user info
 ```bash
 # Replace TOKEN with the access token from login response
 curl -X GET http://localhost:8081/auth/me \

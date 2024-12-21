@@ -1,0 +1,28 @@
+_id: req_d497e2e7abaa409996b58718fc48a023
+type: Request
+parentId: wrk_4cf4fa1c368341d696877c3618b005f3
+modified: 1734698619003
+created: 1734612379817
+url: "{{url}}/auth/identity/{{id}}/role"
+name: New Request
+description: ""
+method: PATCH
+body:
+  mimeType: application/json
+  text: |-
+    {
+        "role": "admin"
+    }
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication: {}
+metaSortKey: -1734612379626.5
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global
