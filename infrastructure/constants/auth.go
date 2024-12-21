@@ -9,4 +9,7 @@ const (
 
 	CookiePathAuth = "/auth"
 	CookiePathRoot = "/"
+
+	MinPasswordLength = 8
+	MaxStringLength   = 128
 )

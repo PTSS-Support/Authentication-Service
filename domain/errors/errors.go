@@ -7,6 +7,11 @@ var (
 	ErrPINAlreadyExists   = errors.New("PIN already exists")
 	ErrNoPINSet           = errors.New("no PIN set")
 
+	ErrInvalidEmail    = errors.New("invalid email")
+	ErrInvalidPassword = errors.New("invalid password")
+
+	ErrMissingToken = errors.New("missing token")
+
 	ErrTokenExpired       = errors.New("token expired")
 	ErrAccountNotLinked   = errors.New("account not linked")
 	ErrInvalidToken       = errors.New("invalid token")

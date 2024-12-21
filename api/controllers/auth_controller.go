@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"net/http"
 
@@ -24,6 +25,7 @@ func (c *AuthController) RegisterRoutes(r *gin.Engine) {
 	auth := r.Group("/auth")
 	{
 		auth.POST("/login", c.Login)
+		auth.POST("/validate", c.ValidateTokens)
 	}
 }
 
@@ -51,4 +53,51 @@ func (c *AuthController) Login(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
 	})
+}
+
+func (c *AuthController) ValidateTokens(ctx *gin.Context) {
+	accessToken, err := util.GetAccessTokenFromCookie(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Missing access token",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	refreshToken, err := util.GetRefreshTokenFromCookie(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Missing refresh token",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	response, err := c.authFacade.HandleTokenValidation(ctx.Request.Context(), accessToken, refreshToken)
+	if err != nil {
+		status := http.StatusBadRequest
+
+		switch err {
+		case errors.ErrTokenExpired:
+			status = http.StatusUnauthorized
+		case errors.ErrInvalidToken:
+			status = http.StatusUnauthorized
+		case errors.ErrInvalidCredentials:
+			status = http.StatusUnauthorized
+		}
+
+		ctx.JSON(status, gin.H{
+			"error":   "Token validation failed",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// If response is nil, tokens are valid and don't need refresh
+	if response != nil {
+		util.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
+	}
+
+	ctx.Status(http.StatusNoContent)
 }

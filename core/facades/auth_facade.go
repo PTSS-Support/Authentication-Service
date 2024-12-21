@@ -10,6 +10,7 @@ import (
 
 type AuthFacade interface {
 	HandleLogin(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error)
+	HandleTokenValidation(ctx context.Context, accessToken, refreshToken string) (*responses.AuthResponse, error)
 }
 
 type authFacade struct {
@@ -24,4 +25,8 @@ func NewAuthFacade(authService services.AuthService) AuthFacade {
 
 func (f *authFacade) HandleLogin(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error) {
 	return f.authService.Login(ctx, req)
+}
+
+func (f *authFacade) HandleTokenValidation(ctx context.Context, accessToken, refreshToken string) (*responses.AuthResponse, error) {
+	return f.authService.ValidateAndRefreshIfNeeded(ctx, accessToken, refreshToken)
 }
