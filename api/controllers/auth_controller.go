@@ -1,9 +1,10 @@
 package controllers
 
 import (
+	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"net/http"
 
-	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
+	"github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
 	"github.com/PTSS-Support/identity-service/core/facades"
 	"github.com/gin-gonic/gin"
 )
@@ -44,5 +45,9 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response)
+	util.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Login successful",
+	})
 }

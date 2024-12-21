@@ -23,10 +23,16 @@ type BaseKeycloakRepository struct {
 
 // NewBaseKeycloakRepository creates a new base repository instance
 func NewBaseKeycloakRepository(config *config.KeycloakConfig) *BaseKeycloakRepository {
+	logger := util.NewLogger("BaseKeycloakRepository")
+	logger.Debug("Creating new repository with config",
+		"baseURL", config.BaseURL,
+		"realm", config.Realm,
+		"clientID", config.ClientID)
+
 	return &BaseKeycloakRepository{
 		config:     config,
 		httpClient: &http.Client{},
-		logger:     util.NewLogger("BaseKeycloakRepository"),
+		logger:     logger,
 	}
 }
 

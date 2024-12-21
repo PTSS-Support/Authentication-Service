@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
 	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/auth"
@@ -26,29 +27,50 @@ func NewAuthRepository(keycloak *BaseKeycloakRepository) AuthRepository {
 }
 
 func (r *authRepository) Login(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error) {
-	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", r.config.BaseURL, r.config.Realm)
+	tokenURL := r.getTokenEndpoint()
 
-	data := url.Values{}
-	data.Set("grant_type", "password")
-	data.Set("client_id", r.config.ClientID)
-	data.Set("client_secret", r.config.ClientSecret)
-	data.Set("username", req.Email)
-	data.Set("password", req.Password)
+	if _, err := url.Parse(tokenURL); err != nil {
+		return nil, fmt.Errorf("invalid token URL: %w", err)
+	}
 
-	resp, err := r.makeRequest(ctx, "POST", tokenURL, data)
+	data := r.prepareLoginData(req.Email, req.Password)
+
+	resp, err := r.makeRequest(ctx, http.MethodPost, tokenURL, data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to make login request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("authentication failed: %d", resp.StatusCode)
+		return nil, fmt.Errorf("authentication failed with status: %d", resp.StatusCode)
 	}
 
 	var authResponse responses.AuthResponse
 	if err := json.NewDecoder(resp.Body).Decode(&authResponse); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode auth response: %w", err)
 	}
 
 	return &authResponse, nil
+}
+
+func (r *authRepository) getTokenEndpoint() string {
+	baseURL := strings.TrimSuffix(r.config.BaseURL, "/")
+	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
+		baseURL = "http://" + baseURL
+	}
+
+	return fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token",
+		baseURL,
+		r.config.Realm,
+	)
+}
+
+func (r *authRepository) prepareLoginData(email, password string) url.Values {
+	data := url.Values{}
+	data.Set("grant_type", "password")
+	data.Set("client_id", r.config.ClientID)
+	data.Set("client_secret", r.config.ClientSecret)
+	data.Set("username", email)
+	data.Set("password", password)
+	return data
 }
