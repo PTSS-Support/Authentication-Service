@@ -130,8 +130,8 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
 
     # Update .env file with client secret
     if [ -n "$CLIENT_SECRET" ]; then
-        if ! grep -q "APP_KEYCLOAK_CLIENT_SECRET=" .env; then
-            echo "APP_KEYCLOAK_CLIENT_SECRET=$CLIENT_SECRET" >> .env
+        if ! grep -q "KEYCLOAK_CLIENT_SECRET=" .env; then
+            echo "KEYCLOAK_CLIENT_SECRET=$CLIENT_SECRET" >> .env
             echo "Client secret added to .env file"
         fi
     else
