@@ -39,5 +39,26 @@ services:
       timeout: 10s
       retries: 3
 
+  init-keycloak:
+    image: alpine:latest
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ./keycloak-init.sh
+        target: /init.sh
+      - type: bind
+        source: ./.env
+        target: /.env
+    command: >
+      sh -c "
+        apk update &&
+        apk add --no-cache curl jq &&
+        dos2unix /init.sh 2>/dev/null || true &&
+        chmod +x /init.sh &&
+        sh /init.sh
+      "
+
 volumes:
   postgres_data:
