@@ -4,7 +4,7 @@ import (
 	"context"
 	responses "github.com/PTSS-Support/identity-service/domain/entities"
 	"github.com/PTSS-Support/identity-service/domain/errors"
-	"github.com/PTSS-Support/identity-service/infrastructure/constants"
+	"github.com/PTSS-Support/identity-service/infrastructure/config"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"regexp"
 	"strings"
@@ -22,12 +22,14 @@ type AuthService interface {
 type authService struct {
 	authRepo repositories.AuthRepository
 	logger   util.Logger
+	config   *config.Config
 }
 
-func NewAuthService(authRepo repositories.AuthRepository) AuthService {
+func NewAuthService(authRepo repositories.AuthRepository, config *config.Config) AuthService {
 	return &authService{
 		authRepo: authRepo,
 		logger:   util.NewLogger("AuthService"),
+		config:   config,
 	}
 }
 
@@ -85,15 +87,15 @@ func (s *authService) ValidateLoginRequest(req *requests.LoginRequest) error {
 		return errors.ErrInvalidEmail
 	}
 
-	if len(req.Password) < constants.MinPasswordLength {
+	if len(req.Password) < s.config.Auth.MinPasswordLength {
 		return errors.ErrInvalidPassword
 	}
 
-	if len(req.Password) > constants.MaxStringLength {
+	if len(req.Password) > s.config.Auth.MaxStringLength {
 		return errors.ErrInvalidPassword
 	}
 
-	if len(req.Email) > constants.MaxStringLength {
+	if len(req.Email) > s.config.Auth.MaxStringLength {
 		return errors.ErrInvalidEmail
 	}
 

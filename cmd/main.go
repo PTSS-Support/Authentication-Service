@@ -21,13 +21,13 @@ func main() {
 
 	// Initialize dependencies
 	baseKeycloakRepo := repositories.NewBaseKeycloakRepository(&cfg.Keycloak)
+	cookieUtil := util.NewCookieUtil(cfg)
 
 	// Auth
 	authRepo := repositories.NewAuthRepository(baseKeycloakRepo)
-	authService := services.NewAuthService(authRepo)
+	authService := services.NewAuthService(authRepo, cfg)
 	authFacade := facades.NewAuthFacade(authService)
 
-	cookieUtil := util.NewCookieUtil(cfg)
 	authController := controllers.NewAuthController(authFacade, cookieUtil)
 
 	// Identity
