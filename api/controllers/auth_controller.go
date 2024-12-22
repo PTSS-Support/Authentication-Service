@@ -1,14 +1,11 @@
 package controllers
 
 import (
-	"github.com/PTSS-Support/identity-service/domain/errors"
-	"github.com/PTSS-Support/identity-service/infrastructure/util"
-	"net/http"
-	"strings"
-
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
 	"github.com/PTSS-Support/identity-service/core/facades"
+	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
 type AuthController struct {
@@ -49,24 +46,22 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
-	util.SetRefreshTokenCookie(ctx, response.RefreshToken)
+	util.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"message":      "Login successful",
-		"access_token": response.AccessToken,
+		"message": "Login successful",
 	})
 }
 
 func (c *AuthController) ValidateTokens(ctx *gin.Context) {
-	authHeader := ctx.GetHeader("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+	accessToken, err := util.GetAccessTokenFromCookie(ctx)
+	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Missing access token",
-			"details": "Authorization header is missing or invalid",
+			"details": err.Error(),
 		})
 		return
 	}
-	accessToken := strings.TrimPrefix(authHeader, "Bearer ")
 
 	refreshToken, err := util.GetRefreshTokenFromCookie(ctx)
 	if err != nil {
@@ -79,18 +74,7 @@ func (c *AuthController) ValidateTokens(ctx *gin.Context) {
 
 	response, err := c.authFacade.HandleTokenValidation(ctx.Request.Context(), accessToken, refreshToken)
 	if err != nil {
-		status := http.StatusBadRequest
-
-		switch err {
-		case errors.ErrTokenExpired:
-			status = http.StatusUnauthorized
-		case errors.ErrInvalidToken:
-			status = http.StatusUnauthorized
-		case errors.ErrInvalidCredentials:
-			status = http.StatusUnauthorized
-		}
-
-		ctx.JSON(status, gin.H{
+		ctx.JSON(http.StatusUnauthorized, gin.H{
 			"error":   "Token validation failed",
 			"details": err.Error(),
 		})
@@ -98,11 +82,7 @@ func (c *AuthController) ValidateTokens(ctx *gin.Context) {
 	}
 
 	if response != nil {
-		util.SetRefreshTokenCookie(ctx, response.RefreshToken)
-		ctx.JSON(http.StatusOK, gin.H{
-			"access_token": response.AccessToken,
-		})
-		return
+		util.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
 	}
 
 	ctx.Status(http.StatusNoContent)
