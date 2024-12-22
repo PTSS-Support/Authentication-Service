@@ -2,11 +2,13 @@ package config
 
 import (
 	"github.com/spf13/viper"
+	"strconv"
 )
 
 type Config struct {
 	Server   ServerConfig
 	Keycloak KeycloakConfig
+	Auth     AuthConfig
 }
 
 type ServerConfig struct {
@@ -25,6 +27,18 @@ type KeycloakConfig struct {
 	ClientSecret string
 }
 
+type AuthConfig struct {
+	AccessTokenCookie    string
+	RefreshTokenCookie   string
+	AccessTokenDuration  int
+	RefreshTokenDuration int
+	CookiePathRoot       string
+	CookiePathAuth       string
+	MinPasswordLength    int
+	MaxStringLength      int
+	CookieDomain         string
+}
+
 func LoadConfig() (*Config, error) {
 	viper.SetConfigFile(".env")
 	viper.SetConfigType("env")
@@ -36,6 +50,10 @@ func LoadConfig() (*Config, error) {
 			return nil, err
 		}
 	}
+	accessTokenDuration, _ := strconv.Atoi(viper.GetString("ACCESS_TOKEN_DURATION"))
+	refreshTokenDuration, _ := strconv.Atoi(viper.GetString("REFRESH_TOKEN_DURATION"))
+	minPasswordLength, _ := strconv.Atoi(viper.GetString("MIN_PASSWORD_LENGTH"))
+	maxStringLength, _ := strconv.Atoi(viper.GetString("MAX_STRING_LENGTH"))
 
 	// Set up direct mappings for env variables
 	viper.AutomaticEnv()
@@ -52,6 +70,17 @@ func LoadConfig() (*Config, error) {
 			AdminPassword: viper.GetString("KEYCLOAK_ADMIN_PASSWORD"),
 			ClientID:      viper.GetString("KEYCLOAK_CLIENT_ID"),
 			ClientSecret:  viper.GetString("KEYCLOAK_CLIENT_SECRET"),
+		},
+		Auth: AuthConfig{
+			AccessTokenCookie:    viper.GetString("ACCESS_TOKEN_COOKIE_NAME"),
+			RefreshTokenCookie:   viper.GetString("REFRESH_TOKEN_COOKIE_NAME"),
+			AccessTokenDuration:  accessTokenDuration,
+			RefreshTokenDuration: refreshTokenDuration,
+			CookiePathRoot:       viper.GetString("ACCESS_TOKEN_COOKIE_PATH"),
+			CookiePathAuth:       viper.GetString("REFRESH_TOKEN_COOKIE_PATH"),
+			MinPasswordLength:    minPasswordLength,
+			MaxStringLength:      maxStringLength,
+			CookieDomain:         viper.GetString("ACCESS_TOKEN_COOKIE_DOMAIN"),
 		},
 	}
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"log"
 
 	"github.com/PTSS-Support/identity-service/api/controllers"
@@ -25,7 +26,9 @@ func main() {
 	authRepo := repositories.NewAuthRepository(baseKeycloakRepo)
 	authService := services.NewAuthService(authRepo)
 	authFacade := facades.NewAuthFacade(authService)
-	authController := controllers.NewAuthController(authFacade)
+
+	cookieUtil := util.NewCookieUtil(cfg)
+	authController := controllers.NewAuthController(authFacade, cookieUtil)
 
 	// Identity
 	identityRepo := repositories.NewIdentityRepository(baseKeycloakRepo)

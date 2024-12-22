@@ -3,34 +3,44 @@ package util
 import (
 	"fmt"
 	"github.com/PTSS-Support/identity-service/domain/errors"
-	"github.com/PTSS-Support/identity-service/infrastructure/constants"
+	"github.com/PTSS-Support/identity-service/infrastructure/config"
 	"github.com/gin-gonic/gin"
 )
 
-func SetAuthCookies(ctx *gin.Context, accessToken, refreshToken string) {
+type CookieUtil struct {
+	config *config.Config
+}
+
+func NewCookieUtil(config *config.Config) *CookieUtil {
+	return &CookieUtil{
+		config: config,
+	}
+}
+
+func (cu *CookieUtil) SetAuthCookies(ctx *gin.Context, accessToken, refreshToken string) {
 	ctx.SetCookie(
-		constants.AccessTokenCookie,
+		cu.config.Auth.AccessTokenCookie,
 		accessToken,
-		constants.AccessTokenDuration,
-		constants.CookiePathRoot,
-		"",
+		cu.config.Auth.AccessTokenDuration,
+		cu.config.Auth.CookiePathRoot,
+		cu.config.Auth.CookieDomain,
 		true,
 		true,
 	)
 
 	ctx.SetCookie(
-		constants.RefreshTokenCookie,
+		cu.config.Auth.RefreshTokenCookie,
 		refreshToken,
-		constants.RefreshTokenDuration,
-		constants.CookiePathAuth,
-		"",
+		cu.config.Auth.RefreshTokenDuration,
+		cu.config.Auth.CookiePathAuth,
+		cu.config.Auth.CookieDomain,
 		true,
 		true,
 	)
 }
 
-func GetAccessTokenFromCookie(ctx *gin.Context) (string, error) {
-	token, err := ctx.Cookie(constants.AccessTokenCookie)
+func (cu *CookieUtil) GetAccessTokenFromCookie(ctx *gin.Context) (string, error) {
+	token, err := ctx.Cookie(cu.config.Auth.AccessTokenCookie)
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", errors.ErrMissingToken, err)
 	}
@@ -42,8 +52,8 @@ func GetAccessTokenFromCookie(ctx *gin.Context) (string, error) {
 	return token, nil
 }
 
-func GetRefreshTokenFromCookie(ctx *gin.Context) (string, error) {
-	token, err := ctx.Cookie(constants.RefreshTokenCookie)
+func (cu *CookieUtil) GetRefreshTokenFromCookie(ctx *gin.Context) (string, error) {
+	token, err := ctx.Cookie(cu.config.Auth.RefreshTokenCookie)
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", errors.ErrMissingToken, err)
 	}

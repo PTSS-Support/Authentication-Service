@@ -11,11 +11,13 @@ import (
 type AuthController struct {
 	BaseController
 	authFacade facades.AuthFacade
+	cookieUtil util.CookieUtil
 }
 
-func NewAuthController(authFacade facades.AuthFacade) *AuthController {
+func NewAuthController(authFacade facades.AuthFacade, cookieUtil *util.CookieUtil) *AuthController {
 	return &AuthController{
 		authFacade: authFacade,
+		cookieUtil: *cookieUtil,
 	}
 }
 
@@ -46,7 +48,7 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
-	util.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
+	c.cookieUtil.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
@@ -54,7 +56,7 @@ func (c *AuthController) Login(ctx *gin.Context) {
 }
 
 func (c *AuthController) ValidateTokens(ctx *gin.Context) {
-	accessToken, err := util.GetAccessTokenFromCookie(ctx)
+	accessToken, err := c.cookieUtil.GetAccessTokenFromCookie(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Missing access token",
@@ -63,7 +65,7 @@ func (c *AuthController) ValidateTokens(ctx *gin.Context) {
 		return
 	}
 
-	refreshToken, err := util.GetRefreshTokenFromCookie(ctx)
+	refreshToken, err := c.cookieUtil.GetRefreshTokenFromCookie(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Missing refresh token",
@@ -82,7 +84,7 @@ func (c *AuthController) ValidateTokens(ctx *gin.Context) {
 	}
 
 	if response != nil {
-		util.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
+		c.cookieUtil.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
 	}
 
 	ctx.Status(http.StatusNoContent)
