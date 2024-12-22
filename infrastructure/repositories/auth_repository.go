@@ -12,13 +12,12 @@ import (
 	"net/url"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
-	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/auth"
 )
 
 type AuthRepository interface {
-	Login(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error)
+	Login(ctx context.Context, req *requests.LoginRequest) (*entities.TokenPair, error)
 	ValidateAccessToken(ctx context.Context, token string) error
-	RefreshTokens(ctx context.Context, refreshToken string) (*responses.AuthResponse, error)
+	RefreshTokens(ctx context.Context, refreshToken string) (*entities.TokenPair, error)
 }
 
 type authRepository struct {
@@ -33,7 +32,7 @@ func NewAuthRepository(keycloak *BaseKeycloakRepository) AuthRepository {
 	}
 }
 
-func (r *authRepository) Login(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error) {
+func (r *authRepository) Login(ctx context.Context, req *requests.LoginRequest) (*entities.TokenPair, error) {
 	log := r.logger.WithContext(ctx)
 	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", r.config.BaseURL, r.config.Realm)
 
@@ -50,7 +49,7 @@ func (r *authRepository) Login(ctx context.Context, req *requests.LoginRequest) 
 		return nil, errors.ErrInvalidCredentials
 	}
 
-	var authResponse responses.AuthResponse
+	var authResponse entities.TokenPair
 	if err := json.NewDecoder(resp.Body).Decode(&authResponse); err != nil {
 		log.Error("Failed to decode login response", "error", err)
 		return nil, errors.ErrInvalidResponse
@@ -111,7 +110,7 @@ func (r *authRepository) ValidateAccessToken(ctx context.Context, token string) 
 	return nil
 }
 
-func (r *authRepository) RefreshTokens(ctx context.Context, refreshToken string) (*responses.AuthResponse, error) {
+func (r *authRepository) RefreshTokens(ctx context.Context, refreshToken string) (*entities.TokenPair, error) {
 	log := r.logger.WithContext(ctx)
 	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token",
 		r.config.BaseURL, r.config.Realm)
@@ -138,7 +137,7 @@ func (r *authRepository) RefreshTokens(ctx context.Context, refreshToken string)
 		return nil, errors.ErrInvalidResponse
 	}
 
-	var authResponse responses.AuthResponse
+	var authResponse entities.TokenPair
 	if err := json.NewDecoder(resp.Body).Decode(&authResponse); err != nil {
 		log.Error("Failed to decode refresh token response", "error", err)
 		return nil, errors.ErrInvalidResponse

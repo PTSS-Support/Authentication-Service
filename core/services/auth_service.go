@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	responses "github.com/PTSS-Support/identity-service/domain/entities"
 	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/constants"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
@@ -9,13 +10,12 @@ import (
 	"strings"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
-	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/auth"
 	"github.com/PTSS-Support/identity-service/infrastructure/repositories"
 )
 
 type AuthService interface {
-	Login(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error)
-	ValidateAndRefreshIfNeeded(ctx context.Context, accessToken, refreshToken string) (*responses.AuthResponse, error)
+	Login(ctx context.Context, req *requests.LoginRequest) (*responses.TokenPair, error)
+	ValidateAndRefreshIfNeeded(ctx context.Context, accessToken, refreshToken string) (*responses.TokenPair, error)
 	ValidateLoginRequest(req *requests.LoginRequest) error
 }
 
@@ -31,14 +31,14 @@ func NewAuthService(authRepo repositories.AuthRepository) AuthService {
 	}
 }
 
-func (s *authService) Login(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error) {
+func (s *authService) Login(ctx context.Context, req *requests.LoginRequest) (*responses.TokenPair, error) {
 	if err := s.ValidateLoginRequest(req); err != nil {
 		return nil, err
 	}
 	return s.authRepo.Login(ctx, req)
 }
 
-func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToken, refreshToken string) (*responses.AuthResponse, error) {
+func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToken, refreshToken string) (*responses.TokenPair, error) {
 	log := s.logger.WithContext(ctx)
 
 	err := s.authRepo.ValidateAccessToken(ctx, accessToken)
