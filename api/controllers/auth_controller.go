@@ -66,13 +66,6 @@ func (c *AuthController) ValidateTokens(ctx *gin.Context) {
 	}
 
 	refreshToken, err := c.cookieUtil.GetRefreshTokenFromCookie(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Missing refresh token",
-			"details": err.Error(),
-		})
-		return
-	}
 
 	response, err := c.authFacade.HandleTokenValidation(ctx.Request.Context(), accessToken, refreshToken)
 	if err != nil {
