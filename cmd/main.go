@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/PTSS-Support/identity-service/api/controllers"
+	"github.com/PTSS-Support/identity-service/api/middleware"
 	"github.com/PTSS-Support/identity-service/core/facades"
 	"github.com/PTSS-Support/identity-service/core/services"
 	"github.com/PTSS-Support/identity-service/infrastructure/config"
@@ -40,6 +41,9 @@ func main() {
 	}
 	r := gin.Default()
 
+	// Add Prometheus middleware BEFORE other middleware
+	r.Use(middleware.PrometheusMiddleware())
+
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
@@ -56,6 +60,10 @@ func main() {
 	})
 
 	// Register routes
+	// Middleware
+	middleware.RegisterMetricsEndpoint(r)
+
+	// Controllers
 	authController.RegisterRoutes(r)
 	identityController.RegisterRoutes(r)
 
