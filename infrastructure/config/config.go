@@ -28,17 +28,19 @@ type KeycloakConfig struct {
 }
 
 type AuthConfig struct {
-	AccessTokenCookie    string
-	RefreshTokenCookie   string
-	AccessTokenDuration  int
-	RefreshTokenDuration int
-	CookiePathRoot       string
-	CookiePathAuth       string
-	MinPasswordLength    int
-	MaxStringLength      int
-	CookieDomain         string
-	HttpOnlyFlag         bool
-	SecureFlag           bool
+	AccessTokenCookie        string
+	RefreshTokenCookie       string
+	AccessTokenDuration      int
+	RefreshTokenDuration     int
+	CookiePathRoot           string
+	CookiePathAuth           string
+	MinPasswordLength        int
+	MaxStringLength          int
+	CookieDomain             string
+	HttpOnlyAccesTokenFlag   bool
+	SecureAccesTokenFlag     bool
+	HttpOnlyRefreshTokenFlag bool
+	SecureRefreshTokenFlag   bool
 }
 
 func LoadConfig() (*Config, error) {
@@ -56,8 +58,10 @@ func LoadConfig() (*Config, error) {
 	refreshTokenDuration, _ := strconv.Atoi(viper.GetString("REFRESH_TOKEN_DURATION"))
 	minPasswordLength, _ := strconv.Atoi(viper.GetString("MIN_PASSWORD_LENGTH"))
 	maxStringLength, _ := strconv.Atoi(viper.GetString("MAX_STRING_LENGTH"))
-	httpOnlyFlag, _ := strconv.ParseBool(viper.GetString("HTTP_ONLY_FLAG"))
-	secureFlag, _ := strconv.ParseBool(viper.GetString("SECURE_FLAG"))
+	httpOnlyAccessTokenFlag, _ := strconv.ParseBool(viper.GetString("HTTP_ONLY_ACCESS_TOKEN_FLAG"))
+	secureAccessTokenFlag, _ := strconv.ParseBool(viper.GetString("SECURE_ACCESS_TOKEN_FLAG"))
+	httpOnlyRefreshTokenFlag, _ := strconv.ParseBool(viper.GetString("HTTP_ONLY_REFRESH_TOKEN_FLAG"))
+	secureRefreshTokenFlag, _ := strconv.ParseBool(viper.GetString("SECURE_REFRESH_TOKEN_FLAG"))
 
 	// Set up direct mappings for env variables
 	viper.AutomaticEnv()
@@ -76,17 +80,19 @@ func LoadConfig() (*Config, error) {
 			ClientSecret:  viper.GetString("KEYCLOAK_CLIENT_SECRET"),
 		},
 		Auth: AuthConfig{
-			AccessTokenCookie:    viper.GetString("ACCESS_TOKEN_COOKIE_NAME"),
-			RefreshTokenCookie:   viper.GetString("REFRESH_TOKEN_COOKIE_NAME"),
-			AccessTokenDuration:  accessTokenDuration,
-			RefreshTokenDuration: refreshTokenDuration,
-			CookiePathRoot:       viper.GetString("ACCESS_TOKEN_COOKIE_PATH"),
-			CookiePathAuth:       viper.GetString("REFRESH_TOKEN_COOKIE_PATH"),
-			MinPasswordLength:    minPasswordLength,
-			MaxStringLength:      maxStringLength,
-			CookieDomain:         viper.GetString("ACCESS_TOKEN_COOKIE_DOMAIN"),
-			HttpOnlyFlag:         httpOnlyFlag,
-			SecureFlag:           secureFlag,
+			AccessTokenCookie:        viper.GetString("ACCESS_TOKEN_COOKIE_NAME"),
+			RefreshTokenCookie:       viper.GetString("REFRESH_TOKEN_COOKIE_NAME"),
+			AccessTokenDuration:      accessTokenDuration,
+			RefreshTokenDuration:     refreshTokenDuration,
+			CookiePathRoot:           viper.GetString("ACCESS_TOKEN_COOKIE_PATH"),
+			CookiePathAuth:           viper.GetString("REFRESH_TOKEN_COOKIE_PATH"),
+			MinPasswordLength:        minPasswordLength,
+			MaxStringLength:          maxStringLength,
+			CookieDomain:             viper.GetString("ACCESS_TOKEN_COOKIE_DOMAIN"),
+			HttpOnlyAccesTokenFlag:   httpOnlyAccessTokenFlag,
+			SecureAccesTokenFlag:     secureAccessTokenFlag,
+			HttpOnlyRefreshTokenFlag: httpOnlyRefreshTokenFlag,
+			SecureRefreshTokenFlag:   secureRefreshTokenFlag,
 		},
 	}
 
