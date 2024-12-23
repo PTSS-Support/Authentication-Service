@@ -37,6 +37,8 @@ type AuthConfig struct {
 	MinPasswordLength    int
 	MaxStringLength      int
 	CookieDomain         string
+	HttpOnlyFlag         bool
+	SecureFlag           bool
 }
 
 func LoadConfig() (*Config, error) {
@@ -54,6 +56,8 @@ func LoadConfig() (*Config, error) {
 	refreshTokenDuration, _ := strconv.Atoi(viper.GetString("REFRESH_TOKEN_DURATION"))
 	minPasswordLength, _ := strconv.Atoi(viper.GetString("MIN_PASSWORD_LENGTH"))
 	maxStringLength, _ := strconv.Atoi(viper.GetString("MAX_STRING_LENGTH"))
+	httpOnlyFlag, _ := strconv.ParseBool(viper.GetString("HTTP_ONLY_FLAG"))
+	secureFlag, _ := strconv.ParseBool(viper.GetString("SECURE_FLAG"))
 
 	// Set up direct mappings for env variables
 	viper.AutomaticEnv()
@@ -81,6 +85,8 @@ func LoadConfig() (*Config, error) {
 			MinPasswordLength:    minPasswordLength,
 			MaxStringLength:      maxStringLength,
 			CookieDomain:         viper.GetString("ACCESS_TOKEN_COOKIE_DOMAIN"),
+			HttpOnlyFlag:         httpOnlyFlag,
+			SecureFlag:           secureFlag,
 		},
 	}
 

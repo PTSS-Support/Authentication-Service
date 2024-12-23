@@ -24,8 +24,8 @@ func (cu *CookieUtil) SetAuthCookies(ctx *gin.Context, accessToken, refreshToken
 		cu.config.Auth.AccessTokenDuration,
 		cu.config.Auth.CookiePathRoot,
 		cu.config.Auth.CookieDomain,
-		true,
-		true,
+		cu.config.Auth.SecureFlag,
+		cu.config.Auth.HttpOnlyFlag,
 	)
 
 	ctx.SetCookie(
@@ -34,8 +34,8 @@ func (cu *CookieUtil) SetAuthCookies(ctx *gin.Context, accessToken, refreshToken
 		cu.config.Auth.RefreshTokenDuration,
 		cu.config.Auth.CookiePathAuth,
 		cu.config.Auth.CookieDomain,
-		true,
-		true,
+		cu.config.Auth.SecureFlag,
+		cu.config.Auth.HttpOnlyFlag,
 	)
 }
 
