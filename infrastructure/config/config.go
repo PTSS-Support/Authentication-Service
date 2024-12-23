@@ -34,8 +34,6 @@ type AuthConfig struct {
 	RefreshTokenDuration     int
 	CookiePathRoot           string
 	CookiePathAuth           string
-	MinPasswordLength        int
-	MaxStringLength          int
 	CookieDomain             string
 	HttpOnlyAccesTokenFlag   bool
 	SecureAccesTokenFlag     bool
@@ -56,8 +54,6 @@ func LoadConfig() (*Config, error) {
 	}
 	accessTokenDuration, _ := strconv.Atoi(viper.GetString("ACCESS_TOKEN_DURATION"))
 	refreshTokenDuration, _ := strconv.Atoi(viper.GetString("REFRESH_TOKEN_DURATION"))
-	minPasswordLength, _ := strconv.Atoi(viper.GetString("MIN_PASSWORD_LENGTH"))
-	maxStringLength, _ := strconv.Atoi(viper.GetString("MAX_STRING_LENGTH"))
 	httpOnlyAccessTokenFlag, _ := strconv.ParseBool(viper.GetString("HTTP_ONLY_ACCESS_TOKEN_FLAG"))
 	secureAccessTokenFlag, _ := strconv.ParseBool(viper.GetString("SECURE_ACCESS_TOKEN_FLAG"))
 	httpOnlyRefreshTokenFlag, _ := strconv.ParseBool(viper.GetString("HTTP_ONLY_REFRESH_TOKEN_FLAG"))
@@ -86,8 +82,6 @@ func LoadConfig() (*Config, error) {
 			RefreshTokenDuration:     refreshTokenDuration,
 			CookiePathRoot:           viper.GetString("ACCESS_TOKEN_COOKIE_PATH"),
 			CookiePathAuth:           viper.GetString("REFRESH_TOKEN_COOKIE_PATH"),
-			MinPasswordLength:        minPasswordLength,
-			MaxStringLength:          maxStringLength,
 			CookieDomain:             viper.GetString("ACCESS_TOKEN_COOKIE_DOMAIN"),
 			HttpOnlyAccesTokenFlag:   httpOnlyAccessTokenFlag,
 			SecureAccesTokenFlag:     secureAccessTokenFlag,

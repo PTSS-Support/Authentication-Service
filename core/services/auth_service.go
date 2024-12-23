@@ -87,17 +87,5 @@ func (s *authService) ValidateLoginRequest(req *requests.LoginRequest) error {
 		return errors.ErrInvalidEmail
 	}
 
-	if len(req.Password) < s.config.Auth.MinPasswordLength {
-		return errors.ErrInvalidPassword
-	}
-
-	if len(req.Password) > s.config.Auth.MaxStringLength {
-		return errors.ErrInvalidPassword
-	}
-
-	if len(req.Email) > s.config.Auth.MaxStringLength {
-		return errors.ErrInvalidEmail
-	}
-
 	return nil
 }
