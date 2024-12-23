@@ -94,6 +94,72 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
             "clientAuthenticatorType": "client-secret"
         }' \
         "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients"
+
+    echo "Client created!"
+
+    # Create user-details client scope
+    echo "Creating client scope..."
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "user-details",
+            "protocol": "openid-connect",
+            "attributes": {
+                "include.in.token.scope": "true",
+                "display.on.consent.screen": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes"
+
+    # Get the scope ID
+    SCOPE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes" \
+        | jq -r '.[] | select(.name=="user-details") | .id')
+
+    # Add user ID mapper
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "user-id",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-property-mapper",
+            "config": {
+                "user.attribute": "id",
+                "claim.name": "user_id",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "realm-roles",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-realm-role-mapper",
+            "config": {
+                "multivalued": "true",
+                "claim.name": "roles",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+
+    # Assign scope to client
+    curl -X PUT \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/default-client-scopes/${SCOPE_ID}"
+
+    echo "Client scope created and assigned to client!"
 fi
 
 # Get client UUID (whether newly created or existing)
@@ -122,6 +188,27 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
                 -d '{
                     "name": "'"${ROLE}"'",
                     "description": "Permission to '"${ROLE}"'"
+                }' \
+                "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/roles"
+            echo "Created role: ${ROLE}"
+        fi
+    done
+
+    # Create custom roles for application specific roles
+    CUSTOM_ROLES="admin family_member primary_relative patient healthcare_professional"
+
+    for ROLE in $CUSTOM_ROLES; do
+        ROLE_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/roles/${ROLE}")
+
+        if [ "$ROLE_EXISTS" = "404" ]; then
+            curl -X POST \
+                -H "Authorization: Bearer $TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{
+                    "name": "'"${ROLE}"'",
+                    "description": "'"${ROLE}"' role"
                 }' \
                 "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/roles"
             echo "Created role: ${ROLE}"
