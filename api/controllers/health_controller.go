@@ -30,7 +30,7 @@ func (c *HealthController) RegisterRoutes(router *gin.Engine) {
 }
 
 func (c *HealthController) getHealth(ctx *gin.Context) {
-	c.handleHealthCheck(ctx, c.healthService.CheckReadiness)
+	c.handleHealthCheck(ctx, c.healthService.CheckHealth)
 }
 
 func (c *HealthController) getLiveness(ctx *gin.Context) {

@@ -21,6 +21,34 @@ func NewHealthService(healthRepo repositories.HealthRepository) *HealthService {
 	}
 }
 
+func (s *HealthService) CheckHealth(ctx context.Context) (*responses.HealthResponse, error) {
+	// Get liveness check
+	livenessResp, err := s.CheckLiveness(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get readiness check
+	readinessResp, err := s.CheckReadiness(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Combine the checks
+	combinedResponse := &responses.HealthResponse{
+		Status: HealthStatus.StatusUp,
+		Checks: append(livenessResp.Checks, readinessResp.Checks...),
+	}
+
+	// If either check is down, mark overall status as down
+	if livenessResp.Status == HealthStatus.StatusDown ||
+		readinessResp.Status == HealthStatus.StatusDown {
+		combinedResponse.Status = HealthStatus.StatusDown
+	}
+
+	return combinedResponse, nil
+}
+
 func (s *HealthService) CheckReadiness(ctx context.Context) (*responses.HealthResponse, error) {
 	keycloakHealth, err := s.healthRepo.CheckHealth(ctx)
 
