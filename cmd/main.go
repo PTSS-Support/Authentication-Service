@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"log"
 
 	"github.com/PTSS-Support/identity-service/api/controllers"
@@ -20,12 +21,14 @@ func main() {
 
 	// Initialize dependencies
 	baseKeycloakRepo := repositories.NewBaseKeycloakRepository(&cfg.Keycloak)
+	cookieUtil := util.NewCookieUtil(cfg)
 
 	// Auth
 	authRepo := repositories.NewAuthRepository(baseKeycloakRepo)
-	authService := services.NewAuthService(authRepo)
+	authService := services.NewAuthService(authRepo, cfg)
 	authFacade := facades.NewAuthFacade(authService)
-	authController := controllers.NewAuthController(authFacade)
+
+	authController := controllers.NewAuthController(authFacade, cookieUtil)
 
 	// Identity
 	identityRepo := repositories.NewIdentityRepository(baseKeycloakRepo)

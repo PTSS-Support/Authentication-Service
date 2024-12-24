@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/PTSS-Support/identity-service/domain/enums"
 	"io"
 	"net/http"
 	"net/url"
@@ -39,62 +40,21 @@ func (r *identityRepository) CreateIdentity(ctx context.Context, identity *entit
 	log := r.logger.WithContext(ctx)
 	log.Info("Starting Keycloak identity creation", "email", identity.Email)
 
-	_, err := r.getAdminToken(ctx)
+	userID, err := r.createKeycloakUser(ctx, identity)
 	if err != nil {
-		log.Error("Failed to get admin token", "error", err)
-		return nil, fmt.Errorf("failed to get admin token: %w", err)
-	}
-	log.Debug("Successfully obtained admin token")
-
-	usersURL := fmt.Sprintf("%s/admin/realms/%s/users", r.config.BaseURL, r.config.Realm)
-	log.Debug("Making request to Keycloak", "url", usersURL)
-
-	// Get the raw password from credentials
-	rawPassword := ""
-	if len(identity.Credentials) > 0 {
-		rawPassword = identity.Credentials[0].Value
+		return nil, fmt.Errorf("failed to create keycloak user: %w", err)
 	}
 
-	// Create request body with raw password
-	createReq := map[string]interface{}{
-		"username":   identity.Email,
-		"email":      identity.Email,
-		"enabled":    true,
-		"attributes": identity.Attributes,
-		"credentials": []map[string]interface{}{
-			{
-				"type":      "password",
-				"value":     rawPassword, // Send raw password, not hashed
-				"temporary": false,
-			},
-		},
+	roleValues, exists := identity.Attributes["role"]
+	if !exists || len(roleValues) == 0 {
+		return nil, fmt.Errorf("role not found in identity attributes")
+	}
+	role := enums.Role(roleValues[0])
+
+	if err := r.assignUserRole(ctx, userID, role); err != nil {
+		return nil, fmt.Errorf("failed to assign role to user: %w", err)
 	}
 
-	resp, err := r.makeJSONRequest(ctx, "POST", usersURL, createReq)
-	if err != nil {
-		log.Error("Failed to make request to Keycloak", "error", err)
-		return nil, fmt.Errorf("failed to make request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		// Read response body for more details
-		body, _ := io.ReadAll(resp.Body)
-		log.Error("Received non-201 status from Keycloak",
-			"statusCode", resp.StatusCode,
-			"body", string(body),
-			"headers", resp.Header)
-		return nil, fmt.Errorf("failed to create user: %d", resp.StatusCode)
-	}
-
-	// Get the created user's ID from Location header
-	location := resp.Header.Get("Location")
-	log.Debug("Got Location header", "location", location)
-
-	userID := location[strings.LastIndex(location, "/")+1:]
-	log.Info("Successfully created user in Keycloak", "id", userID)
-
-	// Retrieve the created identity
 	return r.GetIdentity(ctx, userID)
 }
 
@@ -300,4 +260,87 @@ func (r *identityRepository) UpdatePassword(ctx context.Context, id string, newP
 	}
 
 	return nil
+}
+
+func (r *identityRepository) createKeycloakUser(ctx context.Context, identity *entities.KeycloakIdentity) (string, error) {
+	log := r.logger.WithContext(ctx)
+	usersURL := fmt.Sprintf("%s/admin/realms/%s/users", r.config.BaseURL, r.config.Realm)
+
+	resp, err := r.makeJSONRequest(ctx, "POST", usersURL, identity)
+	if err != nil {
+		return "", fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return "", r.handleNonSuccessResponse(resp)
+	}
+
+	userID := r.extractUserIDFromLocation(resp.Header.Get("Location"))
+	log.Info("Successfully created user in Keycloak", "id", userID)
+
+	return userID, nil
+}
+
+func (r *identityRepository) assignUserRole(ctx context.Context, userID string, role enums.Role) error {
+	roleInfo, err := r.getRoleInfo(ctx, role)
+	if err != nil {
+		return fmt.Errorf("failed to get role info: %w", err)
+	}
+
+	roleURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/role-mappings/realm",
+		r.config.BaseURL, r.config.Realm, userID)
+	roleAssignment := []map[string]interface{}{
+		{
+			"id":   roleInfo["id"],
+			"name": strings.ToLower(string(role)),
+		},
+	}
+
+	resp, err := r.makeJSONRequest(ctx, "POST", roleURL, roleAssignment)
+	if err != nil {
+		return fmt.Errorf("failed to assign role: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		return r.handleNonSuccessResponse(resp)
+	}
+
+	return nil
+}
+
+func (r *identityRepository) getRoleInfo(ctx context.Context, role enums.Role) (map[string]interface{}, error) {
+	roleInfoURL := fmt.Sprintf("%s/admin/realms/%s/roles/%s",
+		r.config.BaseURL, r.config.Realm, strings.ToLower(string(role)))
+
+	resp, err := r.makeJSONRequest(ctx, "GET", roleInfoURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get role info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, r.handleNonSuccessResponse(resp)
+	}
+
+	var roleInfo map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&roleInfo); err != nil {
+		return nil, fmt.Errorf("failed to decode role info: %w", err)
+	}
+
+	return roleInfo, nil
+}
+
+func (r *identityRepository) handleNonSuccessResponse(resp *http.Response) error {
+	body, _ := io.ReadAll(resp.Body)
+	r.logger.Error("Received non-success status from Keycloak",
+		"statusCode", resp.StatusCode,
+		"body", string(body),
+		"headers", resp.Header)
+	return fmt.Errorf("request failed with status: %d", resp.StatusCode)
+}
+
+func (r *identityRepository) extractUserIDFromLocation(location string) string {
+	return location[strings.LastIndex(location, "/")+1:]
 }

@@ -2,14 +2,15 @@ package facades
 
 import (
 	"context"
+	responses "github.com/PTSS-Support/identity-service/domain/entities"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
-	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/auth"
 	"github.com/PTSS-Support/identity-service/core/services"
 )
 
 type AuthFacade interface {
-	HandleLogin(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error)
+	HandleLogin(ctx context.Context, req *requests.LoginRequest) (*responses.TokenPair, error)
+	HandleTokenValidation(ctx context.Context, accessToken, refreshToken string) (*responses.TokenPair, error)
 }
 
 type authFacade struct {
@@ -22,6 +23,10 @@ func NewAuthFacade(authService services.AuthService) AuthFacade {
 	}
 }
 
-func (f *authFacade) HandleLogin(ctx context.Context, req *requests.LoginRequest) (*responses.AuthResponse, error) {
+func (f *authFacade) HandleLogin(ctx context.Context, req *requests.LoginRequest) (*responses.TokenPair, error) {
 	return f.authService.Login(ctx, req)
+}
+
+func (f *authFacade) HandleTokenValidation(ctx context.Context, accessToken, refreshToken string) (*responses.TokenPair, error) {
+	return f.authService.ValidateAndRefreshIfNeeded(ctx, accessToken, refreshToken)
 }

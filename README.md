@@ -28,12 +28,9 @@ docker compose up
 ```
 
 5. Configure Keycloak
-   Follow the [Keycloak Setup Guide](docs/KEYCLOAK_SETUP_GUIDE.md) to:
-   - Create a custom realm
-   - Configure the required client
-   - Set up proper authentication flows
    
-   This is a crucial step for the service to work correctly.
+This should be done automatically. If not
+   follow the [Keycloak Setup Guide](docs/KEYCLOAK_SETUP_GUIDE.md) for more informaiton + troubleshooting sections.
 
 6. Run the application
 ```bash
