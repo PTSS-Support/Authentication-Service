@@ -24,6 +24,11 @@ func main() {
 	baseKeycloakRepo := repositories.NewBaseKeycloakRepository(&cfg.Keycloak)
 	cookieUtil := util.NewCookieUtil(cfg)
 
+	// Health
+	healthRepo := repositories.NewHealthRepository(baseKeycloakRepo)
+	healthService := services.NewHealthService(healthRepo)
+	healthController := controllers.NewHealthController(healthService)
+
 	// Auth
 	authRepo := repositories.NewAuthRepository(baseKeycloakRepo)
 	authService := services.NewAuthService(authRepo, cfg)
@@ -69,14 +74,7 @@ func main() {
 	// Controllers
 	authController.RegisterRoutes(r)
 	identityController.RegisterRoutes(r)
-
-	// Health check endpoint
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":  "healthy",
-			"version": "1.0.0",
-		})
-	})
+	healthController.RegisterRoutes(r)
 
 	// Start server
 	if err := r.Run(":" + cfg.Server.Port); err != nil {
