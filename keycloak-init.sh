@@ -156,25 +156,6 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
         }' \
         "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
 
-    # Add email exclusion mapper
-    curl -X POST \
-        -H "Authorization: Bearer $TOKEN" \
-        -H "Content-Type: application/json" \
-        -d '{
-            "name": "exclude-email",
-            "protocol": "openid-connect",
-            "protocolMapper": "oidc-usermodel-property-mapper",
-            "config": {
-                "user.attribute": "email",
-                "claim.name": "email",
-                "jsonType.label": "String",
-                "id.token.claim": "false",
-                "access.token.claim": "false",
-                "userinfo.token.claim": "false"
-            }
-        }' \
-        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
-
     # Assign scope to client
     curl -X PUT \
         -H "Authorization: Bearer $TOKEN" \
