@@ -293,6 +293,7 @@ fi
 
 
 # removing the default scopes
+# email scope
 EMAIL_SCOPE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
     "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes" \
     | jq -r '.[] | select(.name=="email") | .id')
