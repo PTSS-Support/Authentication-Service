@@ -97,6 +97,9 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
 
     echo "Client created!"
 
+    CLIENT_UUID=$(curl -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${KEYCLOAK_CLIENT_ID}" | jq -r '.[0].id')
+
     # Create user-details client scope
     echo "Creating client scope..."
     curl -X POST \
@@ -166,6 +169,13 @@ fi
 echo "Getting client UUID..."
 CLIENT_UUID=$(curl -H "Authorization: Bearer $TOKEN" \
     "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${KEYCLOAK_CLIENT_ID}" | jq -r '.[0].id')
+
+
+# Finally assign scope to client
+curl -X PUT \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/default-client-scopes/${SCOPE_ID}"
 
 if [ "$CLIENT_EXISTS" = "0" ]; then
     echo "Getting client secret..."
@@ -281,6 +291,43 @@ else
     echo "Admin user already exists, skipping creation..."
 fi
 
+
+# removing the default scopes
+# email scope
+EMAIL_SCOPE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes" \
+    | jq -r '.[] | select(.name=="email") | .id')
+
+if [ -n "$EMAIL_SCOPE_ID" ]; then
+    echo "Removing email scope from client..."
+    curl -X DELETE \
+        -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/default-client-scopes/${EMAIL_SCOPE_ID}"
+fi
+
+# Remove profile scope (contains preferred_username)
+PROFILE_SCOPE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes" \
+    | jq -r '.[] | select(.name=="profile") | .id')
+
+if [ -n "$PROFILE_SCOPE_ID" ]; then
+    echo "Removing profile scope from client..."
+    curl -X DELETE \
+        -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/default-client-scopes/${PROFILE_SCOPE_ID}"
+fi
+
+# Remove roles scope (contains realm_access)
+ROLES_SCOPE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes" \
+    | jq -r '.[] | select(.name=="roles") | .id')
+
+if [ -n "$ROLES_SCOPE_ID" ]; then
+    echo "Removing roles scope from client..."
+    curl -X DELETE \
+        -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/default-client-scopes/${ROLES_SCOPE_ID}"
+fi
 
 # Setup service account permissions
 echo "Setting up service account permissions..."
