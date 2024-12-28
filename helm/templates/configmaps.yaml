@@ -1,0 +1,32 @@
+{{- $appName := .Release.Name }}
+{{- $namespace := .Release.Namespace }}
+{{- $environment := "dev" }}
+{{- if contains "prod" $namespace }}
+{{- $environment = "prod" }}
+{{- end }}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $appName }}-config
+  labels:
+    app: {{ $appName }}
+data:
+  # This template will merge all configs according to priority
+  {{- /* Try to merge configs in order of precedence */ -}}
+  {{- /* The last applied config for any key will take precedence */ -}}
+  {{- if (lookup "v1" "ConfigMap" $namespace "global-cookie-config") }}
+  {{- range $key, $value := (lookup "v1" "ConfigMap" $namespace "global-cookie-config").data }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if (lookup "v1" "ConfigMap" $namespace (printf "%s-config" $appName)) }}
+  {{- range $key, $value := (lookup "v1" "ConfigMap" $namespace (printf "%s-config" $appName)).data }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if (lookup "v1" "ConfigMap" $namespace "env-cookie-config") }}
+  {{- range $key, $value := (lookup "v1" "ConfigMap" $namespace "env-cookie-config").data }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
