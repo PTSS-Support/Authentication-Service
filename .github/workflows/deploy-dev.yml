@@ -9,7 +9,6 @@ on:
         description: 'Image tag (optional)'
         required: false
         default: 'latest'
-
 jobs:
   build:
     runs-on: ubuntu-latest
