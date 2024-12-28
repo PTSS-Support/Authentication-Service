@@ -23,11 +23,21 @@ spec:
           image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           envFrom:
+            # 1. Application-wide configs (lowest priority)
             - configMapRef:
                 name: app-config
                 optional: true
+            # 2. App-specific configs
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+                optional: true
+            # 3. Environment-wide configs
             - configMapRef:
                 name: env-config
+                optional: true
+            # 4. Environment & app specific configs (highest priority)
+            - configMapRef:
+                name: env-{{ .Release.Name }}-config
                 optional: true
             - secretRef:
                 name: env-secrets
