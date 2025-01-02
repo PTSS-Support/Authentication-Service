@@ -1,0 +1,11 @@
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: hotel-keycloak
+  namespace: hotel-dev
+spec:
+  instances: 1
+  hostname:
+    hostname: "keycloak-hotel-dev.apps.inholland.hcs-lab.nl"
+  http:
+    tlsSecret: "keycloak-tls-secret"
