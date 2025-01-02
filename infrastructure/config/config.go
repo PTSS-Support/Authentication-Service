@@ -42,16 +42,8 @@ type AuthConfig struct {
 }
 
 func LoadConfig() (*Config, error) {
-	viper.SetConfigFile(".env")
-	viper.SetConfigType("env")
+	viper.AutomaticEnv()
 
-	// Read the env file
-	err := viper.ReadInConfig()
-	if err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, err
-		}
-	}
 	accessTokenDuration, _ := strconv.Atoi(viper.GetString("ACCESS_TOKEN_DURATION"))
 	refreshTokenDuration, _ := strconv.Atoi(viper.GetString("REFRESH_TOKEN_DURATION"))
 	httpOnlyAccessTokenFlag, _ := strconv.ParseBool(viper.GetString("HTTP_ONLY_ACCESS_TOKEN_FLAG"))
