@@ -41,6 +41,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
           clean: true
+          continue-on-error: true
 
       - name: Build
         run: |
