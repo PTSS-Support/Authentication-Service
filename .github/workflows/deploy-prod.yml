@@ -6,7 +6,7 @@ on:
   workflow_dispatch:  # Manual trigger
     inputs:
       tag:
-        description: 'Image tag (optional)'
+        description: 'Image tag'
         required: true
 
 jobs:
@@ -123,7 +123,7 @@ jobs:
           ROUTE_HOST="${{ steps.app_name.outputs.name }}-prod.${{ vars.APPS_DOMAIN }}"
           echo "name=${ROUTE_HOST}" >> $GITHUB_OUTPUT
 
-      - name: Deploy to OpenShift Pro
+      - name: Deploy to OpenShift Prod
         run: |
           helm upgrade --install ${{ steps.app_name.outputs.name }} ./helm \
             --namespace ${{ vars.OSC_PROD_PROJECT }} \
