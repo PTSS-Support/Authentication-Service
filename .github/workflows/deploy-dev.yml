@@ -45,7 +45,7 @@ jobs:
         run: |
           cd cmd 
           mkdir -p build/
-          CGO_ENABLED=0 GOOS=linux go build -o main .
+          CGO_ENABLED=0 GOOS=linux go build -o ../build/main .
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v3
