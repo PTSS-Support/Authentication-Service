@@ -61,7 +61,7 @@ func (r *BaseKeycloakRepository) makeRequest(ctx context.Context, method, url st
 
 func (r *BaseKeycloakRepository) getAdminToken(ctx context.Context) (string, error) {
 	log := r.logger.WithContext(ctx)
-	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", r.config.BaseURL, "master")
+	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", r.config.BaseURL, r.config.Realm)
 
 	data := url.Values{}
 	data.Set("grant_type", "password")

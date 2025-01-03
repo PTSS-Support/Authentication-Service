@@ -8,4 +8,9 @@ spec:
   hostname:
     hostname: "keycloak-hotel-dev.apps.inholland.hcs-lab.nl"
   http:
-    tlsSecret: "keycloak-tls-secret"
+    httpEnabled: true
+  additionalOptions:
+    - name: FEATURES
+      value: 'hostname:v2'
+    - name: PROXY_HEADERS
+      value: xforwarded
