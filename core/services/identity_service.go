@@ -39,11 +39,13 @@ func NewIdentityService(identityRepo repositories.IdentityRepository) IdentitySe
 
 func (s *identityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword string) (*responses.IdentityResponse, error) {
 	log := s.logger.WithContext(ctx)
-	log.Info("Creating new identity", "email", req.Email, "role", req.Role)
+	sanitizedRole := strings.ReplaceAll(req.Role, "\n", "")
+	sanitizedRole = strings.ReplaceAll(sanitizedRole, "\r", "")
+	log.Info("Creating new identity", "email", req.Email, "role", sanitizedRole)
 
 	if req.Role != enums.RoleHealthcareProfessional && req.Role != enums.RoleAdmin {
 		if req.GroupID == "" {
-			log.Error("GroupID is required for this role", "role", req.Role)
+			log.Error("GroupID is required for this role", "role", sanitizedRole)
 			return nil, errors.ErrGroupIDRequired
 		}
 	}
