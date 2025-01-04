@@ -8,7 +8,7 @@ type CreateIdentityRequest struct {
 	Email     string     `json:"email" binding:"required,email,min=6,max=254"`
 	Password  string     `json:"password" binding:"required,min=8,max=128"`
 	Role      enums.Role `json:"role" binding:"required,oneof=admin family_member primary_relative patient healthcare_professional"`
-	GroupID   string     `json:"groupId" validate:"required,uuid"`
-	FirstName string     `json:"firstName" validate:"required"`
-	LastName  string     `json:"lastName" validate:"required"`
+	GroupID   string     `json:"groupId" binding:"required,uuid"`
+	FirstName string     `json:"firstName" binding:"required"`
+	LastName  string     `json:"lastName" binding:"required"`
 }

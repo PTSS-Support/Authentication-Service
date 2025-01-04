@@ -43,8 +43,11 @@ func (s *identityService) CreateIdentity(ctx context.Context, req *requests.Crea
 
 	// Create domain model
 	identity := &models.Identity{
-		Email: req.Email,
-		Role:  req.Role,
+		Email:     req.Email,
+		Role:      req.Role,
+		GroupID:   req.GroupID,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
 	}
 
 	// Convert to Keycloak entity
