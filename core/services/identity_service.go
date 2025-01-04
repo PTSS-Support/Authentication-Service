@@ -187,6 +187,7 @@ func (s *identityService) SetPIN(ctx context.Context, id string, hashedPIN strin
 
 	// Set PIN in attributes
 	identity.Attributes["pin"] = []string{hashedPIN}
+	identity.Attributes["hasPin"] = []string{"true"}
 
 	// Update in repository
 	_, err = s.identityRepo.UpdateIdentity(ctx, identity)
