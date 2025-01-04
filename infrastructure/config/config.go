@@ -44,7 +44,13 @@ type AuthConfig struct {
 func LoadConfig() (*Config, error) {
 	viper.SetConfigFile(".env")
 	viper.SetConfigType("env")
-
+	// Read the env file
+	err := viper.ReadInConfig()
+	if err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, err
+		}
+	}
 	viper.AutomaticEnv()
 
 	accessTokenDuration, _ := strconv.Atoi(viper.GetString("ACCESS_TOKEN_DURATION"))
