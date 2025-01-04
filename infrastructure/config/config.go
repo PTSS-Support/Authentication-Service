@@ -42,6 +42,9 @@ type AuthConfig struct {
 }
 
 func LoadConfig() (*Config, error) {
+	viper.SetConfigFile(".env")
+	viper.SetConfigType("env")
+
 	viper.AutomaticEnv()
 
 	accessTokenDuration, _ := strconv.Atoi(viper.GetString("ACCESS_TOKEN_DURATION"))
@@ -52,7 +55,6 @@ func LoadConfig() (*Config, error) {
 	secureRefreshTokenFlag, _ := strconv.ParseBool(viper.GetString("SECURE_REFRESH_TOKEN_FLAG"))
 
 	// Set up direct mappings for env variables
-	viper.AutomaticEnv()
 
 	config := &Config{
 		Server: ServerConfig{

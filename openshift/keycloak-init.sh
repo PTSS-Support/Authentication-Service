@@ -155,6 +155,27 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
         }' \
         "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
 
+    # Add hasPin mapper
+    curl -k -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "has-pin-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "config": {
+                "user.attribute": "hasPin",
+                "claim.name": "has_pin",
+                "jsonType.label": "boolean",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "access.tokenResponse.claim": "false",
+                "refresh.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+
     # Assign scope to client
     curl -k -X PUT \
         -H "Authorization: Bearer $TOKEN" \
@@ -183,7 +204,7 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
 
     # Create required realm roles if they don't exist
     echo "Creating realm roles..."
-    ROLES="manage-users view-users create-user validate-tokens"
+    ROLES="manage-users view-users create-user validate-tokens manage-realm view-realm manage-clients view-clients manage-authorization token-exchange impersonation"
 
     for ROLE in $ROLES; do
         ROLE_EXISTS=$(curl -k -s -o /dev/null -w "%{http_code}" \
@@ -246,15 +267,20 @@ if [ "$USER_EXISTS" = "0" ]; then
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
         -d '{
-            "username": "'"${KEYCLOAK_REALM_ADMIN_USERNAME}"'",
-            "enabled": true,
-            "credentials": [{
-                "type": "password",
-                "value": "'"${KEYCLOAK_REALM_ADMIN_PASSWORD}"'",
-                "temporary": false
-            }],
-            "realmRoles": ["admin"]
-        }' \
+               "username": "'"${KEYCLOAK_REALM_ADMIN_USERNAME}"'",
+               "enabled": true,
+               "emailVerified": true,
+               "email": "realm_admin@example.com",
+               "firstName": "Realm",
+               "lastName": "Admin",
+               "credentials": [{
+                   "type": "password",
+                   "value": "'"${KEYCLOAK_REALM_ADMIN_PASSWORD}"'",
+                   "temporary": false
+               }],
+               "requiredActions": [],
+               "realmRoles": ["admin manage-users view-users create-user validate-tokens"]
+           }' \
         "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/users"
     # Get the user ID
     USER_ID=$(curl -k -H "Authorization: Bearer $TOKEN" \
