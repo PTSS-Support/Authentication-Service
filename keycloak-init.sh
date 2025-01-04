@@ -205,7 +205,7 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
 
     # Create required realm roles if they don't exist
     echo "Creating realm roles..."
-    ROLES="manage-users view-users create-user validate-tokens"
+    ROLES="manage-users view-users create-user validate-tokens manage-realm view-realm manage-clients view-clients manage-authorization token-exchange impersonation"
 
     for ROLE in $ROLES; do
         ROLE_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -268,15 +268,20 @@ if [ "$USER_EXISTS" = "0" ]; then
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
         -d '{
-            "username": "'"${KEYCLOAK_REALM_ADMIN_USERNAME}"'",
-            "enabled": true,
-            "credentials": [{
-                "type": "password",
-                "value": "'"${KEYCLOAK_REALM_ADMIN_PASSWORD}"'",
-                "temporary": false
-            }],
-            "realmRoles": ["admin"]
-        }' \
+              "username": "'"${KEYCLOAK_REALM_ADMIN_USERNAME}"'",
+              "enabled": true,
+              "emailVerified": true,
+              "email": "realm_admin@example.com",
+              "firstName": "Realm",
+              "lastName": "Admin",
+              "credentials": [{
+                  "type": "password",
+                  "value": "'"${KEYCLOAK_REALM_ADMIN_PASSWORD}"'",
+                  "temporary": false
+              }],
+              "requiredActions": [],
+              "realmRoles": ["admin manage-users view-users create-user validate-tokens"]
+          }' \
         "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/users"
     # Get the user ID
     USER_ID=$(curl -H "Authorization: Bearer $TOKEN" \
