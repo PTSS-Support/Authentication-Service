@@ -41,6 +41,13 @@ func (s *identityService) CreateIdentity(ctx context.Context, req *requests.Crea
 	log := s.logger.WithContext(ctx)
 	log.Info("Creating new identity", "email", req.Email, "role", req.Role)
 
+	if req.Role != enums.RoleHealthcareProfessional && req.Role != enums.RoleAdmin {
+		if req.GroupID == "" {
+			log.Error("GroupID is required for this role", "role", req.Role)
+			return nil, errors.ErrGroupIDRequired
+		}
+	}
+
 	// Create domain model
 	identity := &models.Identity{
 		Email:     req.Email,

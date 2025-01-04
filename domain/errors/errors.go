@@ -6,6 +6,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrPINAlreadyExists   = errors.New("PIN already exists")
 	ErrNoPINSet           = errors.New("no PIN set")
+	ErrGroupIDRequired    = errors.New("group ID is required for this role")
 
 	ErrInvalidEmail    = errors.New("invalid email")
 	ErrInvalidPassword = errors.New("invalid password")
