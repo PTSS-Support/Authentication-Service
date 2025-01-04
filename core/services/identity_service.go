@@ -95,6 +95,13 @@ func (s *identityService) UpdateRole(ctx context.Context, id string, req *reques
 		return nil, err
 	}
 
+	groupIDValues, hasGroupID := identity.Attributes["groupId"]
+	hasValidGroupID := hasGroupID && len(groupIDValues) > 0 && groupIDValues[0] != ""
+
+	if req.Role != enums.RoleHealthcareProfessional && req.Role != enums.RoleAdmin && !hasValidGroupID {
+		return nil, errors.ErrGroupIDRequired
+	}
+
 	// Update role in attributes
 	identity.Attributes["role"] = []string{string(req.Role)}
 
