@@ -3,6 +3,7 @@ package entities
 import (
 	"github.com/PTSS-Support/identity-service/domain/enums"
 	"github.com/PTSS-Support/identity-service/domain/models"
+	"strconv"
 )
 
 // KeycloakIdentity represents the Keycloak user structure
@@ -40,7 +41,8 @@ func (ki *KeycloakIdentity) ToModel() *models.Identity {
 // FromModel creates a KeycloakIdentity from a domain Identity model
 func FromModel(model *models.Identity, hashedPassword string) *KeycloakIdentity {
 	attributes := map[string][]string{
-		"role": {string(model.Role)},
+		"role":   {string(model.Role)},
+		"hasPin": {strconv.FormatBool(model.PIN != nil)},
 	}
 
 	if model.PIN != nil {
