@@ -137,7 +137,6 @@ func (s *authService) isLocallyAlmostExpired(token string) (bool, error) {
 	}
 
 	now := time.Now().Unix()
-	refreshWindow := int64(s.refreshWindow)
 
-	return now > int64(exp)-refreshWindow, nil
+	return now > int64(exp)-s.refreshWindow, nil
 }
