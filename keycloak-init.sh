@@ -76,7 +76,6 @@ if [ "$REALM_EXISTS" = "404" ]; then
               "accessTokenLifespanForImplicitFlow":1200
                 }' \
         "${KEYCLOAK_BASE_URL}/admin/realms"
-        "${KEYCLOAK_BASE_URL}/admin/realms"
 else
     echo "Realm already exists, skipping creation..."
 fi
