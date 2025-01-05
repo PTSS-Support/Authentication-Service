@@ -39,12 +39,24 @@ func NewIdentityService(identityRepo repositories.IdentityRepository) IdentitySe
 
 func (s *identityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword string) (*responses.IdentityResponse, error) {
 	log := s.logger.WithContext(ctx)
-	log.Info("Creating new identity", "email", req.Email, "role", req.Role)
+	sanitizedRole := strings.ReplaceAll(req.Role, "\n", "")
+	sanitizedRole = strings.ReplaceAll(sanitizedRole, "\r", "")
+	log.Info("Creating new identity", "email", req.Email, "role", sanitizedRole)
+
+	if req.Role != enums.RoleHealthcareProfessional && req.Role != enums.RoleAdmin {
+		if req.GroupID == "" {
+			log.Error("GroupID is required for this role", "role", sanitizedRole)
+			return nil, errors.ErrGroupIDRequired
+		}
+	}
 
 	// Create domain model
 	identity := &models.Identity{
-		Email: req.Email,
-		Role:  req.Role,
+		Email:     req.Email,
+		Role:      req.Role,
+		GroupID:   req.GroupID,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
 	}
 
 	// Convert to Keycloak entity
@@ -83,6 +95,13 @@ func (s *identityService) UpdateRole(ctx context.Context, id string, req *reques
 	identity, err := s.identityRepo.GetIdentity(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	groupIDValues, hasGroupID := identity.Attributes["groupId"]
+	hasValidGroupID := hasGroupID && len(groupIDValues) > 0 && groupIDValues[0] != ""
+
+	if req.Role != enums.RoleHealthcareProfessional && req.Role != enums.RoleAdmin && !hasValidGroupID {
+		return nil, errors.ErrGroupIDRequired
 	}
 
 	// Update role in attributes
@@ -184,6 +203,7 @@ func (s *identityService) SetPIN(ctx context.Context, id string, hashedPIN strin
 
 	// Set PIN in attributes
 	identity.Attributes["pin"] = []string{hashedPIN}
+	identity.Attributes["hasPin"] = []string{"true"}
 
 	// Update in repository
 	_, err = s.identityRepo.UpdateIdentity(ctx, identity)

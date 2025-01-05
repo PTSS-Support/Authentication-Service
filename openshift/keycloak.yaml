@@ -12,5 +12,33 @@ spec:
   additionalOptions:
     - name: FEATURES
       value: 'hostname:v2'
+    - name: PROXY
+      value: edge
+    - name: PROXY_ADDRESS_FORWARDING
+      value: 'true'
     - name: PROXY_HEADERS
       value: xforwarded
+    - name: HEALTH_ENABLED
+      value: 'true'
+    - name: LEGACY-OBSERVABILITY-INTERFACE
+      value: 'true'
+  unsupported:
+    podTemplate:
+      spec:
+        containers:
+          - livenessProbe:
+              httpGet:
+                path: /health/live
+                port: 8080
+                scheme: HTTP
+            name: keycloak
+            readinessProbe:
+              httpGet:
+                path: /health/ready
+                port: 8080
+                scheme: HTTP
+            startupProbe:
+              httpGet:
+                path: /health/started
+                port: 8080
+                scheme: HTTP
