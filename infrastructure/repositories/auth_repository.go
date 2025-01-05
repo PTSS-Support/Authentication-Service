@@ -16,7 +16,7 @@ import (
 
 type AuthRepository interface {
 	Login(ctx context.Context, req *requests.LoginRequest) (*entities.TokenPair, error)
-	ValidateAccessToken(ctx context.Context, token string) error
+	IntrospectAccessToken(ctx context.Context, token string) (*entities.TokenIntrospectionResponse, error)
 	RefreshTokens(ctx context.Context, refreshToken string) (*entities.TokenPair, error)
 }
 
@@ -58,7 +58,7 @@ func (r *authRepository) Login(ctx context.Context, req *requests.LoginRequest) 
 	return &authResponse, nil
 }
 
-func (r *authRepository) ValidateAccessToken(ctx context.Context, token string) error {
+func (r *authRepository) IntrospectAccessToken(ctx context.Context, token string) (*entities.TokenIntrospectionResponse, error) {
 	log := r.logger.WithContext(ctx)
 	introspectURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token/introspect",
 		r.config.BaseURL, r.config.Realm)
@@ -71,7 +71,7 @@ func (r *authRepository) ValidateAccessToken(ctx context.Context, token string) 
 	resp, err := r.makeRequest(ctx, "POST", introspectURL, data)
 	if err != nil {
 		log.Error("Token introspection request failed", "error", err)
-		return errors.ErrConnectionFailed
+		return nil, errors.ErrConnectionFailed
 	}
 
 	defer resp.Body.Close()
@@ -79,25 +79,10 @@ func (r *authRepository) ValidateAccessToken(ctx context.Context, token string) 
 	var introspectResponse entities.TokenIntrospectionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&introspectResponse); err != nil {
 		log.Error("Failed to decode introspection response", "error", err)
-		return errors.ErrInvalidResponse
+		return nil, errors.ErrInvalidResponse
 	}
 
-	switch {
-	case introspectResponse.IsValid():
-		log.Debug("Access token validated successfully")
-		return nil
-	case introspectResponse.IsExpired():
-		log.Debug("Token is expired")
-		return errors.ErrTokenExpired
-	case introspectResponse.HasInvalidSignature():
-		log.Debug("Token has invalid signature")
-		return errors.ErrTokenInvalidSignature
-	default:
-		log.Debug("Token is inactive",
-			"error", introspectResponse.Error,
-			"description", introspectResponse.ErrorMsg)
-		return errors.ErrInvalidToken
-	}
+	return &introspectResponse, nil
 }
 
 func (r *authRepository) RefreshTokens(ctx context.Context, refreshToken string) (*entities.TokenPair, error) {
@@ -119,7 +104,7 @@ func (r *authRepository) RefreshTokens(ctx context.Context, refreshToken string)
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusBadRequest {
-		return nil, errors.ErrTokenExpired
+		return nil, errors.ErrTokenNearlyOrExpired
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -173,7 +158,7 @@ func (r *authRepository) handleKeycloakError(resp *http.Response) error {
 
 	switch keycloakError.Error {
 	case "token_expired":
-		return errors.ErrTokenExpired
+		return errors.ErrTokenNearlyOrExpired
 	case "not_linked":
 		return errors.ErrAccountNotLinked
 	case "invalid_token":

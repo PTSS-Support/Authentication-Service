@@ -64,3 +64,16 @@ func (cu *CookieUtil) GetRefreshTokenFromCookie(ctx *gin.Context) (string, error
 
 	return token, nil
 }
+
+func (cu *CookieUtil) GetPINFromCookie(ctx *gin.Context) (string, error) {
+	pin, err := ctx.Cookie("pin") // Use the actual cookie name from your config
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", errors.ErrMissingPIN, err)
+	}
+
+	if pin == "" {
+		return "", errors.ErrMissingPIN
+	}
+
+	return pin, nil
+}

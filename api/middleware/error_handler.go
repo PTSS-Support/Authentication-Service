@@ -29,7 +29,10 @@ func (h *ErrorHandler) Handle() gin.HandlerFunc {
 
 		if appErr, ok := err.(*errors.AppError); ok {
 			h.logger.Error("Request failed", "error", appErr.Err)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": appErr.ClientMessage})
+			c.JSON(appErr.StatusCode, gin.H{
+				"code":    appErr.Code,
+				"message": appErr.ClientMessage,
+			})
 			return
 		}
 

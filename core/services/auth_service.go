@@ -6,8 +6,11 @@ import (
 	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/config"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/rs/zerolog/log"
 	"regexp"
 	"strings"
+	"time"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
 	"github.com/PTSS-Support/identity-service/infrastructure/repositories"
@@ -48,7 +51,7 @@ func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToke
 		return nil, errors.ErrMissingToken
 	}
 
-	err := s.authRepo.ValidateAccessToken(ctx, accessToken)
+	err := s.ValidateAccessToken(ctx, accessToken)
 	if err == nil {
 		log.Debug("Access token is valid")
 		return nil, nil
@@ -59,7 +62,7 @@ func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToke
 		return nil, err
 	}
 
-	if err != errors.ErrTokenExpired {
+	if err != errors.ErrTokenNearlyOrExpired {
 		log.Error("Unexpected error during access token validation", "error", err)
 		return nil, err
 	}
@@ -69,7 +72,7 @@ func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToke
 		return nil, errors.ErrMissingToken
 	}
 
-	log.Debug("Access token expired, attempting refresh")
+	log.Debug("Access token almost expired, attempting refresh")
 	newTokens, err := s.authRepo.RefreshTokens(ctx, refreshToken)
 	if err != nil {
 		log.Error("Failed to refresh tokens", "error", err)
@@ -96,4 +99,49 @@ func (s *authService) ValidateLoginRequest(req *requests.LoginRequest) error {
 	}
 
 	return nil
+}
+
+func (s *authService) ValidateAccessToken(ctx context.Context, token string) error {
+	introspectResponse, err := s.authRepo.IntrospectAccessToken(ctx, token)
+	if err != nil {
+		return err
+	}
+
+	if !introspectResponse.Active {
+		log.Debug("Token is invalid")
+		return errors.ErrTokenInvalidSignature
+	}
+
+	almostExpired, err := s.isLocallyAlmostExpired(token)
+	if err != nil {
+		return err
+	}
+
+	if almostExpired {
+		log.Debug("Token is near expiry")
+		return errors.ErrTokenNearlyOrExpired
+	}
+
+	log.Debug("Token is valid")
+	return nil
+}
+
+func (s *authService) isLocallyAlmostExpired(token string) (bool, error) {
+	parser := jwt.Parser{}
+	claims := jwt.MapClaims{}
+
+	_, _, err := parser.ParseUnverified(token, claims)
+	if err != nil {
+		return false, errors.ErrInvalidToken
+	}
+
+	exp, ok := claims["exp"].(float64)
+	if !ok {
+		return false, errors.ErrInvalidToken
+	}
+
+	now := time.Now().Unix()
+	refreshWindow := int64(300) // 5 minutes in seconds
+
+	return now > int64(exp)-refreshWindow, nil
 }
