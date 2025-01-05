@@ -45,26 +45,29 @@ func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToke
 
 	err := s.authRepo.ValidateAccessToken(ctx, accessToken)
 	if err == nil {
-		// Access token is still valid, no need to refresh
 		log.Debug("Access token is valid")
 		return nil, nil
 	}
 
-	if err != errors.ErrTokenExpired && err != errors.ErrInvalidToken {
+	if err == errors.ErrTokenInvalidSignature {
+		log.Info("Access token has invalid signature")
+		return nil, err
+	}
+
+	if err != errors.ErrTokenExpired {
 		log.Error("Unexpected error during access token validation", "error", err)
 		return nil, err
 	}
 
-	log.Debug("Access token is expired/invalid, attempting refresh")
+	if refreshToken == "" {
+		log.Info("Refresh token is missing")
+		return nil, errors.ErrMissingToken
+	}
 
-	// Try to refresh the tokens
+	log.Debug("Access token expired, attempting refresh")
 	newTokens, err := s.authRepo.RefreshTokens(ctx, refreshToken)
 	if err != nil {
-		if err == errors.ErrTokenExpired {
-			log.Info("Refresh token is expired, user needs to login again")
-		} else {
-			log.Error("Failed to refresh tokens", "error", err)
-		}
+		log.Error("Failed to refresh tokens", "error", err)
 		return nil, err
 	}
 
