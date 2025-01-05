@@ -25,10 +25,10 @@ type authRepository struct {
 	logger util.Logger
 }
 
-func NewAuthRepository(keycloak *BaseKeycloakRepository) AuthRepository {
+func NewAuthRepository(keycloak *BaseKeycloakRepository, loggerFactory util.LoggerFactory) AuthRepository {
 	return &authRepository{
 		BaseKeycloakRepository: keycloak,
-		logger:                 util.NewLogger("AuthRepository"),
+		logger:                 loggerFactory.NewLogger("AuthRepository"),
 	}
 }
 

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
 	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/identity"
@@ -30,16 +31,16 @@ type identityService struct {
 	logger       util.Logger
 }
 
-func NewIdentityService(identityRepo repositories.IdentityRepository) IdentityService {
+func NewIdentityService(identityRepo repositories.IdentityRepository, loggerFactory util.LoggerFactory) IdentityService {
 	return &identityService{
 		identityRepo: identityRepo,
-		logger:       util.NewLogger("IdentityService"),
+		logger:       loggerFactory.NewLogger("IdentityService"),
 	}
 }
 
 func (s *identityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword string) (*responses.IdentityResponse, error) {
 	log := s.logger.WithContext(ctx)
-	sanitizedRole := strings.ReplaceAll(req.Role, "\n", "")
+	sanitizedRole := strings.ReplaceAll(string(req.Role), "\n", "")
 	sanitizedRole = strings.ReplaceAll(sanitizedRole, "\r", "")
 	log.Info("Creating new identity", "email", req.Email, "role", sanitizedRole)
 

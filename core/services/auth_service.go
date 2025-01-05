@@ -25,10 +25,10 @@ type authService struct {
 	config   *config.Config
 }
 
-func NewAuthService(authRepo repositories.AuthRepository, config *config.Config) AuthService {
+func NewAuthService(authRepo repositories.AuthRepository, config *config.Config, loggerFactory util.LoggerFactory) AuthService {
 	return &authService{
 		authRepo: authRepo,
-		logger:   util.NewLogger("AuthService"),
+		logger:   loggerFactory.NewLogger("AuthService"),
 		config:   config,
 	}
 }

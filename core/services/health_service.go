@@ -14,10 +14,10 @@ type HealthService struct {
 	logger     util.Logger
 }
 
-func NewHealthService(healthRepo repositories.HealthRepository) *HealthService {
+func NewHealthService(healthRepo repositories.HealthRepository, loggerFactory util.LoggerFactory) *HealthService {
 	return &HealthService{
 		healthRepo: healthRepo,
-		logger:     util.NewLogger("HealthService"),
+		logger:     loggerFactory.NewLogger("HealthService"),
 	}
 }
 

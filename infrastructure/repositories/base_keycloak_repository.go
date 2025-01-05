@@ -22,11 +22,11 @@ type BaseKeycloakRepository struct {
 }
 
 // NewBaseKeycloakRepository creates a new base repository instance
-func NewBaseKeycloakRepository(config *config.KeycloakConfig) *BaseKeycloakRepository {
+func NewBaseKeycloakRepository(config *config.KeycloakConfig, loggerFactory util.LoggerFactory) *BaseKeycloakRepository {
 	return &BaseKeycloakRepository{
 		config:     config,
 		httpClient: &http.Client{},
-		logger:     util.NewLogger("BaseKeycloakRepository"),
+		logger:     loggerFactory.NewLogger("BaseKeycloakRepository"),
 	}
 }
 
