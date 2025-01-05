@@ -66,7 +66,7 @@ var (
 		StatusCode:    http.StatusUnauthorized,
 	}
 
-	ErrTokenNearlyOrExpired = &AppError{
+	ErrTokenExpired = &AppError{
 		Code:          "TOKEN_EXPIRED",
 		Err:           errors.New("token is expired"),
 		ClientMessage: "Your session has expired. Please log in again to continue.",

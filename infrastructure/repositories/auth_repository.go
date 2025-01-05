@@ -104,7 +104,7 @@ func (r *authRepository) RefreshTokens(ctx context.Context, refreshToken string)
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusBadRequest {
-		return nil, errors.ErrTokenNearlyOrExpired
+		return nil, errors.ErrTokenExpired
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -158,7 +158,7 @@ func (r *authRepository) handleKeycloakError(resp *http.Response) error {
 
 	switch keycloakError.Error {
 	case "token_expired":
-		return errors.ErrTokenNearlyOrExpired
+		return errors.ErrTokenExpired
 	case "not_linked":
 		return errors.ErrAccountNotLinked
 	case "invalid_token":
