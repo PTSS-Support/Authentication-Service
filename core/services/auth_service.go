@@ -7,7 +7,6 @@ import (
 	"github.com/PTSS-Support/identity-service/infrastructure/config"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/rs/zerolog/log"
 	"regexp"
 	"strings"
 	"time"
@@ -23,16 +22,18 @@ type AuthService interface {
 }
 
 type authService struct {
-	authRepo repositories.AuthRepository
-	logger   util.Logger
-	config   *config.Config
+	authRepo      repositories.AuthRepository
+	logger        util.Logger
+	config        *config.Config
+	refreshWindow int64
 }
 
 func NewAuthService(authRepo repositories.AuthRepository, config *config.Config, loggerFactory util.LoggerFactory) AuthService {
 	return &authService{
-		authRepo: authRepo,
-		logger:   loggerFactory.NewLogger("AuthService"),
-		config:   config,
+		authRepo:      authRepo,
+		logger:        loggerFactory.NewLogger("AuthService"),
+		config:        config,
+		refreshWindow: 300, // 5 minutes
 	}
 }
 
@@ -51,20 +52,25 @@ func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToke
 		return nil, errors.ErrMissingToken
 	}
 
-	err := s.ValidateAccessToken(ctx, accessToken)
-	if err == nil {
-		log.Debug("Access token is valid")
+	isValid, err := s.isValidAccessToken(ctx, accessToken, log)
+	if err != nil {
+		log.Error("Error validating access token", "error", err)
+		return nil, err
+	}
+
+	if !isValid {
+		log.Info("Access token is invalid")
+		return nil, errors.ErrInvalidToken
+	}
+
+	almostExpired, err := s.isLocallyAlmostExpired(accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	if !almostExpired {
+		log.Debug("Token is valid and not near expiry")
 		return nil, nil
-	}
-
-	if err == errors.ErrTokenInvalidSignature {
-		log.Info("Access token has invalid signature")
-		return nil, err
-	}
-
-	if err != errors.ErrTokenNearlyOrExpired {
-		log.Error("Unexpected error during access token validation", "error", err)
-		return nil, err
 	}
 
 	if refreshToken == "" {
@@ -101,29 +107,19 @@ func (s *authService) ValidateLoginRequest(req *requests.LoginRequest) error {
 	return nil
 }
 
-func (s *authService) ValidateAccessToken(ctx context.Context, token string) error {
+func (s *authService) isValidAccessToken(ctx context.Context, token string, log util.Logger) (bool, error) {
 	introspectResponse, err := s.authRepo.IntrospectAccessToken(ctx, token)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if !introspectResponse.Active {
 		log.Debug("Token is invalid")
-		return errors.ErrTokenInvalidSignature
-	}
-
-	almostExpired, err := s.isLocallyAlmostExpired(token)
-	if err != nil {
-		return err
-	}
-
-	if almostExpired {
-		log.Debug("Token is near expiry")
-		return errors.ErrTokenNearlyOrExpired
+		return false, errors.ErrInvalidToken
 	}
 
 	log.Debug("Token is valid")
-	return nil
+	return true, nil
 }
 
 func (s *authService) isLocallyAlmostExpired(token string) (bool, error) {
@@ -141,7 +137,7 @@ func (s *authService) isLocallyAlmostExpired(token string) (bool, error) {
 	}
 
 	now := time.Now().Unix()
-	refreshWindow := int64(300) // 5 minutes in seconds
+	refreshWindow := int64(s.refreshWindow)
 
 	return now > int64(exp)-refreshWindow, nil
 }
