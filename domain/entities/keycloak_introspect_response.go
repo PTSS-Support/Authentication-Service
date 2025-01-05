@@ -12,8 +12,10 @@ func (t *TokenIntrospectionResponse) IsValid() bool {
 }
 
 func (t *TokenIntrospectionResponse) IsExpired() bool {
-	// see https://www.keycloak.org/securing-apps/token-exchange 'making request' section for more details on what could be in error field
-	return !t.Active && t.Error == "token_expired"
+	// Keycloak only returns {"active": false} for expired tokens
+	// see https://www.keycloak.org/docs/latest/authorization_services/index.html#obtaining-information-about-an-rpt or
+	//https://www.keycloak.org/securing-apps/token-exchange 'making request' section
+	return !t.Active && t.Error == ""
 }
 
 func (t *TokenIntrospectionResponse) HasInvalidSignature() bool {
