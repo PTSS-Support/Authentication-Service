@@ -19,6 +19,8 @@ type AuthService interface {
 	Login(ctx context.Context, req *requests.LoginRequest) (*responses.TokenPair, error)
 	ValidateAndRefreshIfNeeded(ctx context.Context, accessToken, refreshToken string) (*responses.TokenPair, error)
 	ValidateLoginRequest(req *requests.LoginRequest) error
+	ValidateAndIntrospectRefreshToken(ctx context.Context, refreshToken string) (*responses.TokenIntrospectionResponse, error)
+	RefreshTokens(ctx context.Context, refreshToken string) (*responses.TokenPair, error)
 }
 
 type authService struct {
@@ -42,6 +44,32 @@ func (s *authService) Login(ctx context.Context, req *requests.LoginRequest) (*r
 		return nil, err
 	}
 	return s.authRepo.Login(ctx, req)
+}
+
+func (s *authService) ValidateAndIntrospectRefreshToken(ctx context.Context, refreshToken string) (*responses.TokenIntrospectionResponse, error) {
+	log := s.logger.WithContext(ctx)
+
+	if refreshToken == "" {
+		log.Info("Refresh token is missing")
+		return nil, errors.ErrMissingToken
+	}
+
+	response, err := s.authRepo.IntrospectToken(ctx, refreshToken)
+	if err != nil {
+		log.Error("Failed to validate refresh token", "error", err)
+		return nil, err
+	}
+
+	if !response.Active {
+		log.Info("Refresh token is not active")
+		return nil, errors.ErrInvalidToken
+	}
+
+	return response, nil
+}
+
+func (s *authService) RefreshTokens(ctx context.Context, refreshToken string) (*responses.TokenPair, error) {
+	return s.authRepo.RefreshTokens(ctx, refreshToken)
 }
 
 func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToken, refreshToken string) (*responses.TokenPair, error) {
@@ -108,7 +136,7 @@ func (s *authService) ValidateLoginRequest(req *requests.LoginRequest) error {
 }
 
 func (s *authService) isValidAccessToken(ctx context.Context, token string, log util.Logger) (bool, error) {
-	introspectResponse, err := s.authRepo.IntrospectAccessToken(ctx, token)
+	introspectResponse, err := s.authRepo.IntrospectToken(ctx, token)
 	if err != nil {
 		return false, err
 	}

@@ -5,4 +5,5 @@ type TokenIntrospectionResponse struct {
 	Exp      int64  `json:"exp"`
 	Error    string `json:"error"`
 	ErrorMsg string `json:"error_description"`
+	Sub      string `json:"sub"`
 }

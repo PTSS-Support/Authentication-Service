@@ -16,7 +16,7 @@ import (
 
 type AuthRepository interface {
 	Login(ctx context.Context, req *requests.LoginRequest) (*entities.TokenPair, error)
-	IntrospectAccessToken(ctx context.Context, token string) (*entities.TokenIntrospectionResponse, error)
+	IntrospectToken(ctx context.Context, token string) (*entities.TokenIntrospectionResponse, error)
 	RefreshTokens(ctx context.Context, refreshToken string) (*entities.TokenPair, error)
 }
 
@@ -58,8 +58,13 @@ func (r *authRepository) Login(ctx context.Context, req *requests.LoginRequest) 
 	return &authResponse, nil
 }
 
-func (r *authRepository) IntrospectAccessToken(ctx context.Context, token string) (*entities.TokenIntrospectionResponse, error) {
+func (r *authRepository) IntrospectToken(ctx context.Context, token string) (*entities.TokenIntrospectionResponse, error) {
 	log := r.logger.WithContext(ctx)
+
+	if token == "" {
+		return nil, errors.ErrMissingToken
+	}
+
 	introspectURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token/introspect",
 		r.config.BaseURL, r.config.Realm)
 
@@ -80,6 +85,46 @@ func (r *authRepository) IntrospectAccessToken(ctx context.Context, token string
 	if err := json.NewDecoder(resp.Body).Decode(&introspectResponse); err != nil {
 		log.Error("Failed to decode introspection response", "error", err)
 		return nil, errors.ErrInvalidResponse
+	}
+
+	return &introspectResponse, nil
+}
+
+func (r *authRepository) ValidateRefreshToken(ctx context.Context, refreshToken string) (*entities.TokenIntrospectionResponse, error) {
+	log := r.logger.WithContext(ctx)
+	introspectURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token/introspect",
+		r.config.BaseURL, r.config.Realm)
+
+	if refreshToken == "" {
+		return nil, errors.ErrMissingToken
+	}
+
+	data := url.Values{}
+	data.Set("token", refreshToken)
+	data.Set("client_id", r.config.ClientID)
+	data.Set("client_secret", r.config.ClientSecret)
+
+	resp, err := r.makeRequest(ctx, "POST", introspectURL, data)
+	if err != nil {
+		log.Error("Token introspection request failed", "error", err)
+		return nil, errors.ErrConnectionFailed
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Error("Invalid response from introspection endpoint", "statusCode", resp.StatusCode)
+		return nil, r.handleKeycloakError(resp)
+	}
+
+	var introspectResponse entities.TokenIntrospectionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&introspectResponse); err != nil {
+		log.Error("Failed to decode introspection response", "error", err)
+		return nil, errors.ErrInvalidResponse
+	}
+
+	if !introspectResponse.Active {
+		log.Info("Refresh token is not active")
+		return nil, errors.ErrInvalidToken
 	}
 
 	return &introspectResponse, nil

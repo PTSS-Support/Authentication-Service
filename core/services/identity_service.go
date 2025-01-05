@@ -24,6 +24,7 @@ type IdentityService interface {
 	GetCurrentPINHash(ctx context.Context, id string) (string, error)
 	UpdatePIN(ctx context.Context, id string, hashedPIN string) error
 	SetPIN(ctx context.Context, id string, hashedPIN string) error
+	GetHashedPIN(ctx context.Context, userID string) (string, error)
 }
 
 type identityService struct {
@@ -209,4 +210,24 @@ func (s *identityService) SetPIN(ctx context.Context, id string, hashedPIN strin
 	// Update in repository
 	_, err = s.identityRepo.UpdateIdentity(ctx, identity)
 	return err
+}
+
+func (s *identityService) GetHashedPIN(ctx context.Context, userID string) (string, error) {
+	log := s.logger.WithContext(ctx)
+
+	// Get current identity
+	identity, err := s.identityRepo.GetIdentity(ctx, userID)
+	if err != nil {
+		log.Error("Failed to get identity", "error", err)
+		return "", err
+	}
+
+	// Check PIN in attributes
+	pinValues, exists := identity.Attributes["pin"]
+	if !exists || len(pinValues) == 0 {
+		log.Info("PIN not set for user")
+		return "", errors.ErrNoPINSet
+	}
+
+	return pinValues[0], nil
 }

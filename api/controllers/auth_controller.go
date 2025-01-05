@@ -3,6 +3,7 @@ package controllers
 import (
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
 	"github.com/PTSS-Support/identity-service/core/facades"
+	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -26,6 +27,7 @@ func (c *AuthController) RegisterRoutes(r *gin.Engine) {
 	{
 		auth.POST("/login", c.Login)
 		auth.POST("/validate", c.ValidateOrRefreshTokens)
+		auth.POST("login/pin", c.ValidateWithPIN)
 	}
 }
 
@@ -69,5 +71,29 @@ func (c *AuthController) ValidateOrRefreshTokens(ctx *gin.Context) {
 	if response != nil {
 		c.cookieUtil.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
 	}
+	ctx.Status(http.StatusNoContent)
+}
+
+func (c *AuthController) ValidateWithPIN(ctx *gin.Context) {
+	refreshToken, _ := c.cookieUtil.GetRefreshTokenFromCookie(ctx)
+
+	var req requests.PINValidationRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.Error(&errors.AppError{
+			Code:          "INVALID_REQUEST",
+			Err:           err,
+			ClientMessage: "Invalid PIN format",
+			StatusCode:    http.StatusBadRequest,
+		})
+		return
+	}
+
+	response, err := c.authFacade.HandlePINValidation(ctx.Request.Context(), refreshToken, req.PIN)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	c.cookieUtil.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
 	ctx.Status(http.StatusNoContent)
 }

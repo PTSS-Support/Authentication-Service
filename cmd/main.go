@@ -31,19 +31,18 @@ func main() {
 	healthService := services.NewHealthService(healthRepo, loggerFactory)
 	healthController := controllers.NewHealthController(healthService)
 
-	// Auth
-	authRepo := repositories.NewAuthRepository(baseKeycloakRepo, loggerFactory)
-	authService := services.NewAuthService(authRepo, cfg, loggerFactory)
-	authFacade := facades.NewAuthFacade(authService)
-
-	authController := controllers.NewAuthController(authFacade, cookieUtil)
-
 	// Identity
 	identityRepo := repositories.NewIdentityRepository(baseKeycloakRepo, loggerFactory)
 	identityService := services.NewIdentityService(identityRepo, loggerFactory)
 	encryptionService := services.NewEncryptionService()
 	identityFacade := facades.NewIdentityFacade(identityService, encryptionService, loggerFactory)
 	identityController := controllers.NewIdentityController(identityFacade)
+
+	// Auth
+	authRepo := repositories.NewAuthRepository(baseKeycloakRepo, loggerFactory)
+	authService := services.NewAuthService(authRepo, cfg, loggerFactory)
+	authFacade := facades.NewAuthFacade(authService, identityService, encryptionService, loggerFactory)
+	authController := controllers.NewAuthController(authFacade, cookieUtil)
 
 	errorHandler := middleware.NewErrorHandler(loggerFactory)
 	// Setup Gin in appropriate mode

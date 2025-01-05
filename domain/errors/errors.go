@@ -31,6 +31,13 @@ var (
 		StatusCode:    http.StatusConflict,
 	}
 
+	ErrWrongPin = &AppError{
+		Code:          "WRONG_PIN",
+		Err:           errors.New("wrong PIN entered"),
+		ClientMessage: "Incorrect Pin. Please try again.",
+		StatusCode:    http.StatusUnauthorized,
+	}
+
 	ErrNoPINSet = &AppError{
 		Code:          "NO_PIN",
 		Err:           errors.New("no PIN set"),
@@ -109,7 +116,7 @@ var (
 	}
 
 	ErrMissingPIN = &AppError{
-		Code:          "ERR_MISSING_PIN",
+		Code:          "MISSING_PIN",
 		Err:           errors.New("missing PIN"),
 		ClientMessage: "Please enter your PIN to continue.",
 		StatusCode:    http.StatusBadRequest,
