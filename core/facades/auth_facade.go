@@ -5,6 +5,7 @@ import (
 	responses "github.com/PTSS-Support/identity-service/domain/entities"
 	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
+	"strconv"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
 	"github.com/PTSS-Support/identity-service/core/services"
@@ -46,6 +47,10 @@ func (f *authFacade) HandleTokenValidation(ctx context.Context, accessToken, ref
 func (f *authFacade) HandlePINValidation(ctx context.Context, refreshToken, pin string) (*responses.TokenPair, error) {
 	log := f.logger.WithContext(ctx)
 
+	if err := ValidatePIN(pin); err != nil {
+		return nil, err
+	}
+
 	userInfo, err := f.authService.ValidateAndIntrospectRefreshToken(ctx, refreshToken)
 	if err != nil {
 		log.Debug("Invalid refresh token")
@@ -80,4 +85,17 @@ func (f *authFacade) HandlePINValidation(ctx context.Context, refreshToken, pin 
 	}
 
 	return newTokens, nil
+}
+
+func ValidatePIN(pin string) error {
+	if len(pin) != 4 {
+		return errors.ErrInvalidPINFormat
+	}
+
+	// Check if PIN is numeric
+	if _, err := strconv.Atoi(pin); err != nil {
+		return errors.ErrInvalidPINNumeric
+	}
+
+	return nil
 }

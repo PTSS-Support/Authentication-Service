@@ -121,4 +121,18 @@ var (
 		ClientMessage: "Please enter your PIN to continue.",
 		StatusCode:    http.StatusBadRequest,
 	}
+
+	ErrInvalidPINFormat = &AppError{
+		Code:          "INVALID_PIN_FORMAT",
+		Err:           errors.New("PIN must be exactly 4 digits"),
+		ClientMessage: "PIN must be exactly 4 digits",
+		StatusCode:    http.StatusBadRequest,
+	}
+
+	ErrInvalidPINNumeric = &AppError{
+		Code:          "INVALID_PIN_FORMAT",
+		Err:           errors.New("PIN must contain only numbers"),
+		ClientMessage: "PIN must contain only numbers",
+		StatusCode:    http.StatusBadRequest,
+	}
 )
