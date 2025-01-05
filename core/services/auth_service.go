@@ -43,6 +43,11 @@ func (s *authService) Login(ctx context.Context, req *requests.LoginRequest) (*r
 func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToken, refreshToken string) (*responses.TokenPair, error) {
 	log := s.logger.WithContext(ctx)
 
+	if accessToken == "" {
+		log.Info("Access token is missing")
+		return nil, errors.ErrMissingToken
+	}
+
 	err := s.authRepo.ValidateAccessToken(ctx, accessToken)
 	if err == nil {
 		log.Debug("Access token is valid")
