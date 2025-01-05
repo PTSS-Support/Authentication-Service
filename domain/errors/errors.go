@@ -66,13 +66,6 @@ var (
 		StatusCode:    http.StatusUnauthorized,
 	}
 
-	ErrTokenInvalidSignature = &AppError{
-		Code:          "INVALID_TOKEN",
-		Err:           errors.New("token has invalid signature"),
-		ClientMessage: "Your authentication token is invalid. Please log in again.",
-		StatusCode:    http.StatusUnauthorized,
-	}
-
 	ErrTokenNearlyOrExpired = &AppError{
 		Code:          "TOKEN_EXPIRED",
 		Err:           errors.New("token is expired"),
