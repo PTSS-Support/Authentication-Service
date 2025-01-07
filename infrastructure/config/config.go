@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/spf13/viper"
+	"log"
 	"strconv"
 )
 
@@ -47,9 +48,7 @@ func LoadConfig() (*Config, error) {
 	// Read the env file
 	err := viper.ReadInConfig()
 	if err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, err
-		}
+		log.Printf("Warning: Error loading .env file: %v", err)
 	}
 	viper.AutomaticEnv()
 
