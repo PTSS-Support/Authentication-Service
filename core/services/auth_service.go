@@ -6,7 +6,6 @@ import (
 	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/config"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
-	"github.com/golang-jwt/jwt/v4"
 	"regexp"
 	"strings"
 	"time"
@@ -80,7 +79,7 @@ func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToke
 		return nil, errors.ErrMissingToken
 	}
 
-	isValid, err := s.isValidAccessToken(ctx, accessToken, log)
+	isValid, introspectedToken, err := s.isValidAccessToken(ctx, accessToken, log)
 	if err != nil {
 		log.Error("Error validating access token", "error", err)
 		return nil, err
@@ -91,7 +90,7 @@ func (s *authService) ValidateAndRefreshIfNeeded(ctx context.Context, accessToke
 		return nil, errors.ErrInvalidToken
 	}
 
-	almostExpired, err := s.isLocallyAlmostExpired(accessToken)
+	almostExpired, err := s.isAlmostExpired(introspectedToken)
 	if err != nil {
 		return nil, err
 	}
@@ -135,36 +134,27 @@ func (s *authService) ValidateLoginRequest(req *requests.LoginRequest) error {
 	return nil
 }
 
-func (s *authService) isValidAccessToken(ctx context.Context, token string, log util.Logger) (bool, error) {
+func (s *authService) isValidAccessToken(ctx context.Context, token string, log util.Logger) (bool, *responses.TokenIntrospectionResponse, error) {
 	introspectResponse, err := s.authRepo.IntrospectToken(ctx, token)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	if !introspectResponse.Active {
 		log.Debug("Token is invalid")
-		return false, errors.ErrInvalidToken
+		return false, nil, errors.ErrInvalidToken
 	}
 
 	log.Debug("Token is valid")
-	return true, nil
+	return true, introspectResponse, nil
 }
 
-func (s *authService) isLocallyAlmostExpired(token string) (bool, error) {
-	parser := jwt.Parser{}
-	claims := jwt.MapClaims{}
-
-	_, _, err := parser.ParseUnverified(token, claims)
-	if err != nil {
-		return false, errors.ErrInvalidToken
-	}
-
-	exp, ok := claims["exp"].(float64)
-	if !ok {
+func (s *authService) isAlmostExpired(introspectedToken *responses.TokenIntrospectionResponse) (bool, error) {
+	if introspectedToken == nil {
 		return false, errors.ErrInvalidToken
 	}
 
 	now := time.Now().Unix()
 
-	return now > int64(exp)-s.refreshWindow, nil
+	return now > introspectedToken.Exp-s.refreshWindow, nil
 }
