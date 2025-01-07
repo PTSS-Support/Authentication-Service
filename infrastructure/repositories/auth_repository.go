@@ -16,7 +16,7 @@ import (
 
 type AuthRepository interface {
 	Login(ctx context.Context, req *requests.LoginRequest) (*entities.TokenPair, error)
-	ValidateAccessToken(ctx context.Context, token string) error
+	IntrospectToken(ctx context.Context, token string) (*entities.TokenIntrospectionResponse, error)
 	RefreshTokens(ctx context.Context, refreshToken string) (*entities.TokenPair, error)
 }
 
@@ -25,10 +25,10 @@ type authRepository struct {
 	logger util.Logger
 }
 
-func NewAuthRepository(keycloak *BaseKeycloakRepository) AuthRepository {
+func NewAuthRepository(keycloak *BaseKeycloakRepository, loggerFactory util.LoggerFactory) AuthRepository {
 	return &authRepository{
 		BaseKeycloakRepository: keycloak,
-		logger:                 util.NewLogger("AuthRepository"),
+		logger:                 loggerFactory.NewLogger("AuthRepository"),
 	}
 }
 
@@ -58,56 +58,76 @@ func (r *authRepository) Login(ctx context.Context, req *requests.LoginRequest) 
 	return &authResponse, nil
 }
 
-func (r *authRepository) ValidateAccessToken(ctx context.Context, token string) error {
+func (r *authRepository) IntrospectToken(ctx context.Context, token string) (*entities.TokenIntrospectionResponse, error) {
 	log := r.logger.WithContext(ctx)
-	userinfoURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/userinfo",
-		r.config.BaseURL, r.config.Realm)
 
-	log.Debug("Validating access token",
-		"url", userinfoURL,
-		"token_length", len(token))
-
-	req, err := http.NewRequestWithContext(ctx, "GET", userinfoURL, nil)
-	if err != nil {
-		log.Error("Failed to create userinfo request", "error", err)
-		return errors.ErrInvalidRequest
+	if token == "" {
+		return nil, errors.ErrMissingToken
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
+	introspectURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token/introspect",
+		r.config.BaseURL, r.config.Realm)
 
-	log.Debug("Sending userinfo request with headers",
-		"headers", req.Header)
+	data := url.Values{}
+	data.Set("token", token)
+	data.Set("client_id", r.config.ClientID)
+	data.Set("client_secret", r.config.ClientSecret)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.makeRequest(ctx, "POST", introspectURL, data)
 	if err != nil {
-		log.Error("Userinfo request failed", "error", err)
-		return errors.ErrConnectionFailed
+		log.Error("Token introspection request failed", "error", err)
+		return nil, errors.ErrConnectionFailed
+	}
+
+	defer resp.Body.Close()
+
+	var introspectResponse entities.TokenIntrospectionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&introspectResponse); err != nil {
+		log.Error("Failed to decode introspection response", "error", err)
+		return nil, errors.ErrInvalidResponse
+	}
+
+	return &introspectResponse, nil
+}
+
+func (r *authRepository) ValidateRefreshToken(ctx context.Context, refreshToken string) (*entities.TokenIntrospectionResponse, error) {
+	log := r.logger.WithContext(ctx)
+	introspectURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token/introspect",
+		r.config.BaseURL, r.config.Realm)
+
+	if refreshToken == "" {
+		return nil, errors.ErrMissingToken
+	}
+
+	data := url.Values{}
+	data.Set("token", refreshToken)
+	data.Set("client_id", r.config.ClientID)
+	data.Set("client_secret", r.config.ClientSecret)
+
+	resp, err := r.makeRequest(ctx, "POST", introspectURL, data)
+	if err != nil {
+		log.Error("Token introspection request failed", "error", err)
+		return nil, errors.ErrConnectionFailed
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	log.Debug("Received userinfo response",
-		"statusCode", resp.StatusCode,
-		"body", string(body),
-		"headers", resp.Header)
-
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusBadRequest {
-			log.Debug("Received BadRequest response", "body", string(body))
-			return r.handleKeycloakError(resp)
-		}
-		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-			log.Debug("Received Unauthorized/Forbidden response", "body", string(body))
-			return errors.ErrInvalidToken
-		}
-		log.Error("Unexpected response",
-			"statusCode", resp.StatusCode,
-			"body", string(body))
-		return errors.ErrInvalidResponse
+		log.Error("Invalid response from introspection endpoint", "statusCode", resp.StatusCode)
+		return nil, r.handleKeycloakError(resp)
 	}
 
-	log.Debug("Access token validated successfully")
-	return nil
+	var introspectResponse entities.TokenIntrospectionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&introspectResponse); err != nil {
+		log.Error("Failed to decode introspection response", "error", err)
+		return nil, errors.ErrInvalidResponse
+	}
+
+	if !introspectResponse.Active {
+		log.Info("Refresh token is not active")
+		return nil, errors.ErrInvalidToken
+	}
+
+	return &introspectResponse, nil
 }
 
 func (r *authRepository) RefreshTokens(ctx context.Context, refreshToken string) (*entities.TokenPair, error) {

@@ -20,29 +20,31 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	loggerFactory := util.NewLoggerFactory()
+
 	// Initialize dependencies
-	baseKeycloakRepo := repositories.NewBaseKeycloakRepository(&cfg.Keycloak)
+	baseKeycloakRepo := repositories.NewBaseKeycloakRepository(&cfg.Keycloak, loggerFactory)
 	cookieUtil := util.NewCookieUtil(cfg)
 
 	// Health
 	healthRepo := repositories.NewHealthRepository(baseKeycloakRepo)
-	healthService := services.NewHealthService(healthRepo)
+	healthService := services.NewHealthService(healthRepo, loggerFactory)
 	healthController := controllers.NewHealthController(healthService)
 
-	// Auth
-	authRepo := repositories.NewAuthRepository(baseKeycloakRepo)
-	authService := services.NewAuthService(authRepo, cfg)
-	authFacade := facades.NewAuthFacade(authService)
-
-	authController := controllers.NewAuthController(authFacade, cookieUtil)
-
 	// Identity
-	identityRepo := repositories.NewIdentityRepository(baseKeycloakRepo)
-	identityService := services.NewIdentityService(identityRepo)
+	identityRepo := repositories.NewIdentityRepository(baseKeycloakRepo, loggerFactory)
+	identityService := services.NewIdentityService(identityRepo, loggerFactory)
 	encryptionService := services.NewEncryptionService()
-	identityFacade := facades.NewIdentityFacade(identityService, encryptionService)
+	identityFacade := facades.NewIdentityFacade(identityService, encryptionService, loggerFactory)
 	identityController := controllers.NewIdentityController(identityFacade)
 
+	// Auth
+	authRepo := repositories.NewAuthRepository(baseKeycloakRepo, loggerFactory)
+	authService := services.NewAuthService(authRepo, cfg, loggerFactory)
+	authFacade := facades.NewAuthFacade(authService, identityService, encryptionService, loggerFactory)
+	authController := controllers.NewAuthController(authFacade, cookieUtil)
+
+	errorHandler := middleware.NewErrorHandler(loggerFactory)
 	// Setup Gin in appropriate mode
 	if gin.Mode() == gin.ReleaseMode {
 		gin.DisableConsoleColor()
@@ -51,6 +53,8 @@ func main() {
 
 	// Add Prometheus middleware BEFORE other middleware
 	r.Use(middleware.PrometheusMiddleware())
+	r.Use(gin.Recovery())
+	r.Use(errorHandler.Handle())
 
 	// CORS middleware
 	r.Use(func(c *gin.Context) {

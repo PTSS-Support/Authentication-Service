@@ -29,10 +29,10 @@ type identityRepository struct {
 	logger util.Logger
 }
 
-func NewIdentityRepository(keycloak *BaseKeycloakRepository) IdentityRepository {
+func NewIdentityRepository(keycloak *BaseKeycloakRepository, loggerFactory util.LoggerFactory) IdentityRepository {
 	return &identityRepository{
 		BaseKeycloakRepository: keycloak,
-		logger:                 util.NewLogger("IdentityRepository"),
+		logger:                 loggerFactory.NewLogger("IdentityRepository"),
 	}
 }
 

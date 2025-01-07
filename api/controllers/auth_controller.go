@@ -25,7 +25,8 @@ func (c *AuthController) RegisterRoutes(r *gin.Engine) {
 	auth := r.Group("/auth")
 	{
 		auth.POST("/login", c.Login)
-		auth.POST("/validate", c.ValidateTokens)
+		auth.POST("/validate", c.ValidateOrRefreshTokens)
+		auth.POST("login/pin", c.ValidateWithPIN)
 	}
 }
 
@@ -55,30 +56,33 @@ func (c *AuthController) Login(ctx *gin.Context) {
 	})
 }
 
-func (c *AuthController) ValidateTokens(ctx *gin.Context) {
-	accessToken, err := c.cookieUtil.GetAccessTokenFromCookie(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Missing access token",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	refreshToken, err := c.cookieUtil.GetRefreshTokenFromCookie(ctx)
+func (c *AuthController) ValidateOrRefreshTokens(ctx *gin.Context) {
+	accessToken, _ := c.cookieUtil.GetAccessTokenFromCookie(ctx)
+	refreshToken, _ := c.cookieUtil.GetRefreshTokenFromCookie(ctx)
 
 	response, err := c.authFacade.HandleTokenValidation(ctx.Request.Context(), accessToken, refreshToken)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Token validation failed",
-			"details": err.Error(),
-		})
+		// Let the global error handler deal with it
+		ctx.Error(err)
 		return
 	}
 
 	if response != nil {
 		c.cookieUtil.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
 	}
+	ctx.Status(http.StatusNoContent)
+}
 
+func (c *AuthController) ValidateWithPIN(ctx *gin.Context) {
+	refreshToken, _ := c.cookieUtil.GetRefreshTokenFromCookie(ctx)
+	pin, _ := c.cookieUtil.GetPINFromCookie(ctx)
+
+	response, err := c.authFacade.HandlePINValidation(ctx.Request.Context(), refreshToken, pin)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	c.cookieUtil.SetAuthCookies(ctx, response.AccessToken, response.RefreshToken)
 	ctx.Status(http.StatusNoContent)
 }

@@ -26,11 +26,11 @@ type identityFacade struct {
 	logger            util.Logger
 }
 
-func NewIdentityFacade(identityService services.IdentityService, encryptionService services.EncryptionService) IdentityFacade {
+func NewIdentityFacade(identityService services.IdentityService, encryptionService services.EncryptionService, loggerFactory util.LoggerFactory) IdentityFacade {
 	return &identityFacade{
 		identityService:   identityService,
 		encryptionService: encryptionService,
-		logger:            util.NewLogger("IdentityFacade"),
+		logger:            loggerFactory.NewLogger("IdentityFacade"),
 	}
 }
 

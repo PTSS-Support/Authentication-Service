@@ -64,7 +64,17 @@ if [ "$REALM_EXISTS" = "404" ]; then
     curl -X POST \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
-        -d '{"realm":"'"${KEYCLOAK_REALM}"'", "enabled":true}' \
+        -d '{
+              "realm":"'"${KEYCLOAK_REALM}"'",
+              "enabled":true,
+              "accessTokenLifespan":1200,
+              "ssoSessionIdleTimeout":2592000,
+              "ssoSessionMaxLifespan":2592000,
+              "offlineSessionIdleTimeout":2592000,
+              "offlineSessionMaxLifespan":2592000,
+              "refreshTokenMaxReuse":0,
+              "accessTokenLifespanForImplicitFlow":1200
+                }' \
         "${KEYCLOAK_BASE_URL}/admin/realms"
 else
     echo "Realm already exists, skipping creation..."
