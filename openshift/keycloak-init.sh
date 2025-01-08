@@ -32,7 +32,7 @@ check_required_var "KEYCLOAK_REALM_ADMIN_PASSWORD"
 if [ "$USE_DOCKER" = "true" ]; then
     KEYCLOAK_BASE_URL="http://keycloak:8080"
     echo "Running in Docker mode, using URL: ${KEYCLOAK_BASE_URL}"
-    until curl -k -f "${KEYCLOAK_BASE_URL}/health/ready"; do
+    until curl -k -f "http://keycloak:9000/health/ready"; do
         echo "Trying to connect to Keycloak at: ${KEYCLOAK_BASE_URL}/health/ready"
         echo "Waiting for Keycloak to start..."
         sleep 5
@@ -160,6 +160,63 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
             "config": {
                 "multivalued": "true",
                 "claim.name": "roles",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+
+    # Add firstName mapper
+    curl -k -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "first-name",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-property-mapper",
+            "config": {
+                "user.attribute": "firstName",
+                "claim.name": "first_name",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+
+    # Add lastName mapper
+    curl -k -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "last-name",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-property-mapper",
+            "config": {
+                "user.attribute": "lastName",
+                "claim.name": "last_name",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+
+    # Add groupId mapper
+    curl -k -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "group-id",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "config": {
+                "user.attribute": "groupId",
+                "claim.name": "group_id",
                 "jsonType.label": "String",
                 "id.token.claim": "true",
                 "access.token.claim": "true",

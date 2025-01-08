@@ -74,18 +74,11 @@ func (s *identityService) CreateIdentity(ctx context.Context, req *requests.Crea
 
 	log.Debug("Successfully created identity in Keycloak", "id", createdIdentity.ID)
 
-	// Extract role from attributes
-	var role enums.Role
-	if roleValues, exists := createdIdentity.Attributes["role"]; exists && len(roleValues) > 0 {
-		role = enums.Role(roleValues[0])
-		log.Debug("Extracted role from attributes", "role", role)
-	}
-
 	// Convert to response
 	response := &responses.IdentityResponse{
 		ID:    createdIdentity.ID,
 		Email: createdIdentity.Email,
-		Role:  role,
+		Role:  req.Role,
 	}
 	log.Info("Successfully created identity", "id", response.ID, "email", response.Email)
 

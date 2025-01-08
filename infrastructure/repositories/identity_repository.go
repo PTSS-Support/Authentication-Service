@@ -109,6 +109,34 @@ func (r *identityRepository) GetIdentity(ctx context.Context, id string) (*entit
 		return nil, err
 	}
 
+	roles, err := r.GetUserRoles(ctx, id)
+	if err != nil {
+		log.Error("Failed to get user roles", "error", err)
+		return nil, err
+	}
+
+	if identity.Attributes == nil {
+		identity.Attributes = make(map[string][]string)
+	}
+
+	if len(roles) > 0 {
+		identity.Attributes["role"] = []string{roles[0]} // Use first role as main role
+	}
+
+	requiredAttributes := []string{"role", "groupId", "hasPin"}
+	for _, attr := range requiredAttributes {
+		if _, exists := identity.Attributes[attr]; !exists {
+			identity.Attributes[attr] = []string{""}
+		}
+	}
+
+	log.Debug("Completed identity fetch",
+		"id", identity.ID,
+		"email", identity.Email,
+		"role", identity.Attributes["role"],
+		"groupId", identity.Attributes["groupId"],
+		"hasPin", identity.Attributes["hasPin"])
+
 	return &identity, nil
 }
 
@@ -343,4 +371,45 @@ func (r *identityRepository) handleNonSuccessResponse(resp *http.Response) error
 
 func (r *identityRepository) extractUserIDFromLocation(location string) string {
 	return location[strings.LastIndex(location, "/")+1:]
+}
+
+func (r *identityRepository) GetUserRoles(ctx context.Context, userID string) ([]string, error) {
+	token, err := r.getAdminToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	roleURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/role-mappings/realm",
+		r.config.BaseURL, r.config.Realm, userID)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", roleURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get user roles: %d", resp.StatusCode)
+	}
+
+	var roles []map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&roles); err != nil {
+		return nil, err
+	}
+
+	var roleNames []string
+	for _, role := range roles {
+		if name, ok := role["name"].(string); ok {
+			roleNames = append(roleNames, name)
+		}
+	}
+
+	return roleNames, nil
 }
