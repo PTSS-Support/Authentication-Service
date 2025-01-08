@@ -9,6 +9,13 @@ spec:
     hostname: "keycloak-hotel-dev.apps.inholland.hcs-lab.nl"
   http:
     httpEnabled: true
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
   additionalOptions:
     - name: FEATURES
       value: 'hostname:v2'
@@ -26,12 +33,12 @@ spec:
     podTemplate:
       spec:
         containers:
-          - livenessProbe:
+          - name: keycloak
+            livenessProbe:
               httpGet:
                 path: /health/live
                 port: 8080
                 scheme: HTTP
-            name: keycloak
             readinessProbe:
               httpGet:
                 path: /health/ready
@@ -42,3 +49,7 @@ spec:
                 path: /health/started
                 port: 8080
                 scheme: HTTP
+              timeoutSeconds: 1
+              periodSeconds: 15
+              successThreshold: 1
+              failureThreshold: 10
