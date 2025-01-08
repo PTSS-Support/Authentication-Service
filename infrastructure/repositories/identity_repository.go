@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/PTSS-Support/identity-service/domain/enums"
 	"io"
 	"net/http"
 	"net/url"
@@ -43,16 +42,6 @@ func (r *identityRepository) CreateIdentity(ctx context.Context, identity *entit
 	userID, err := r.createKeycloakUser(ctx, identity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keycloak user: %w", err)
-	}
-
-	roleValues, exists := identity.Attributes["role"]
-	if !exists || len(roleValues) == 0 {
-		return nil, fmt.Errorf("role not found in identity attributes")
-	}
-	role := enums.Role(roleValues[0])
-
-	if err := r.assignUserRole(ctx, userID, role); err != nil {
-		return nil, fmt.Errorf("failed to assign role to user: %w", err)
 	}
 
 	return r.GetIdentity(ctx, userID)
@@ -280,56 +269,6 @@ func (r *identityRepository) createKeycloakUser(ctx context.Context, identity *e
 	log.Info("Successfully created user in Keycloak", "id", userID)
 
 	return userID, nil
-}
-
-func (r *identityRepository) assignUserRole(ctx context.Context, userID string, role enums.Role) error {
-	roleInfo, err := r.getRoleInfo(ctx, role)
-	if err != nil {
-		return fmt.Errorf("failed to get role info: %w", err)
-	}
-
-	roleURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/role-mappings/realm",
-		r.config.BaseURL, r.config.Realm, userID)
-	roleAssignment := []map[string]interface{}{
-		{
-			"id":   roleInfo["id"],
-			"name": strings.ToLower(string(role)),
-		},
-	}
-
-	resp, err := r.makeJSONRequest(ctx, "POST", roleURL, roleAssignment)
-	if err != nil {
-		return fmt.Errorf("failed to assign role: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusNoContent {
-		return r.handleNonSuccessResponse(resp)
-	}
-
-	return nil
-}
-
-func (r *identityRepository) getRoleInfo(ctx context.Context, role enums.Role) (map[string]interface{}, error) {
-	roleInfoURL := fmt.Sprintf("%s/admin/realms/%s/roles/%s",
-		r.config.BaseURL, r.config.Realm, strings.ToLower(string(role)))
-
-	resp, err := r.makeJSONRequest(ctx, "GET", roleInfoURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get role info: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, r.handleNonSuccessResponse(resp)
-	}
-
-	var roleInfo map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&roleInfo); err != nil {
-		return nil, fmt.Errorf("failed to decode role info: %w", err)
-	}
-
-	return roleInfo, nil
 }
 
 func (r *identityRepository) handleNonSuccessResponse(resp *http.Response) error {

@@ -67,6 +67,143 @@ if [ "$REALM_EXISTS" = "404" ]; then
               "accessTokenLifespanForImplicitFlow":1200
                 }' \
         "${KEYCLOAK_BASE_URL}/admin/realms"
+
+    echo "Configuring user profile attributes..."
+    # shellcheck disable=SC2016
+    curl -X PUT \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+                  "attributes": [
+                      {
+                          "name": "username",
+                          "displayName": "${username}",
+                          "validations": {
+                              "length": {
+                                  "min": 3,
+                                  "max": 255
+                              },
+                              "username-prohibited-characters": {},
+                              "up-username-not-idn-homograph": {}
+                          },
+                          "permissions": {
+                              "view": ["admin"],
+                              "edit": ["admin", "user"]
+                          },
+                          "multivalued": false
+                      },
+                      {
+                          "name": "email",
+                          "displayName": "${email}",
+                          "validations": {
+                              "email": {},
+                              "length": {
+                                  "max": 255
+                              }
+                          },
+                          "required": {
+                              "roles": ["user"]
+                          },
+                          "permissions": {
+                              "view": ["admin"],
+                              "edit": ["admin", "user"]
+                          },
+                          "multivalued": false
+                      },
+                      {
+                          "name": "firstName",
+                          "displayName": "${firstName}",
+                          "validations": {
+                              "length": {
+                                  "max": 255
+                              },
+                              "person-name-prohibited-characters": {}
+                          },
+                          "required": {
+                              "roles": ["user"]
+                          },
+                          "permissions": {
+                              "view": ["admin", "user"],
+                              "edit": ["admin", "user"]
+                          },
+                          "multivalued": false
+                      },
+                      {
+                          "name": "lastName",
+                          "displayName": "${lastName}",
+                          "validations": {
+                              "length": {
+                                  "max": 255
+                              },
+                              "person-name-prohibited-characters": {}
+                          },
+                          "required": {
+                              "roles": ["user"]
+                          },
+                          "permissions": {
+                              "view": ["admin", "user"],
+                              "edit": ["admin", "user"]
+                          },
+                          "multivalued": false
+                      },
+                      {
+                          "name": "groupId",
+                          "displayName": "group id",
+                          "permissions": {
+                              "edit": ["admin", "user"],
+                              "view": ["user", "admin"]
+                          },
+                          "multivalued": false,
+                          "annotations": {},
+                          "validations": {}
+                      },
+                      {
+                          "name": "role",
+                          "displayName": "Role",
+                          "permissions": {
+                              "edit": ["admin"],
+                              "view": ["user", "admin"]
+                          },
+                          "multivalued": false,
+                          "annotations": {},
+                          "validations": {
+                              "length": { "min": 1, "max": 255 }
+                          }
+                      },
+                      {
+                          "name": "hasPin",
+                          "displayName": "Has PIN",
+                          "permissions": {
+                              "edit": ["admin", "user"],
+                              "view": ["user", "admin"]
+                          },
+                          "multivalued": false,
+                          "annotations": {},
+                          "validations": {}
+                      },
+                      {
+                          "name": "pin",
+                          "displayName": "PIN",
+                          "permissions": {
+                              "edit": ["admin", "user"],
+                              "view": ["user", "admin"]
+                          },
+                          "multivalued": false,
+                          "annotations": {},
+                          "validations": {
+                              "length": { "min": 1, "max": 255 }
+                          }
+                      }
+                  ],
+                  "groups": [
+                      {
+                          "name": "user-metadata",
+                          "displayHeader": "User metadata",
+                          "displayDescription": "Attributes, which refer to user metadata"
+                      }
+                  ]
+              }'  \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/users/profile"
 else
     echo "Realm already exists, skipping creation..."
 fi
@@ -149,6 +286,63 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
             "config": {
                 "multivalued": "true",
                 "claim.name": "roles",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+
+    # Add firstName mapper
+    curl -k -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "first-name",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-property-mapper",
+            "config": {
+                "user.attribute": "firstName",
+                "claim.name": "first_name",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+
+    # Add lastName mapper
+    curl -k -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "last-name",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-property-mapper",
+            "config": {
+                "user.attribute": "lastName",
+                "claim.name": "last_name",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+
+    # Add groupId mapper
+    curl -k -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "group-id",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "config": {
+                "user.attribute": "groupId",
+                "claim.name": "group_id",
                 "jsonType.label": "String",
                 "id.token.claim": "true",
                 "access.token.claim": "true",
