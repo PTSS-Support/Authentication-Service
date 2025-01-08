@@ -40,7 +40,7 @@ if [ "$USE_DOCKER" = "true" ]; then
 fi
 
 
-# Login to get admin token
+# Login to get temp_admin token
 echo "Logging in as admin..."
 TOKEN=$(curl -k -d "client_id=${KEYCLOAK_ADMIN_CLIENT_ID}" \
     -d "username=${KEYCLOAK_ADMIN_USERNAME}" \
@@ -57,6 +57,9 @@ fi
 REALM_EXISTS=$(curl -k -s -o /dev/null -w "%{http_code}" \
     -H "Authorization: Bearer $TOKEN" \
     "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}")
+
+echo "Realm check result: $REALM_EXISTS"
+
 
 if [ "$REALM_EXISTS" = "404" ]; then
     echo "Creating realm..."
