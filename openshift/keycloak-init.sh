@@ -29,17 +29,6 @@ check_required_var "KEYCLOAK_CLIENT_ID"
 check_required_var "KEYCLOAK_REALM_ADMIN_USERNAME"
 check_required_var "KEYCLOAK_REALM_ADMIN_PASSWORD"
 
-if [ "$USE_DOCKER" = "true" ]; then
-    KEYCLOAK_BASE_URL="http://keycloak:8080"
-    echo "Running in Docker mode, using URL: ${KEYCLOAK_BASE_URL}"
-    until curl -k -f "${KEYCLOAK_BASE_URL}/health/ready"; do
-        echo "Trying to connect to Keycloak at: ${KEYCLOAK_BASE_URL}/health/ready"
-        echo "Waiting for Keycloak to start..."
-        sleep 5
-    done
-fi
-
-
 # Login to get temp_admin token
 echo "Logging in as admin..."
 TOKEN=$(curl -k -d "client_id=${KEYCLOAK_ADMIN_CLIENT_ID}" \
