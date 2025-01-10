@@ -112,6 +112,8 @@ func (r *identityRepository) UpdateIdentity(ctx context.Context, identity *entit
 	// Update user attributes and basic info
 	updateReq := map[string]interface{}{
 		"email":      identity.Email,
+		"firstName":  identity.FirstName,
+		"lastName":   identity.LastName,
 		"attributes": identity.Attributes,
 	}
 
