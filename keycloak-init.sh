@@ -303,6 +303,25 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
         }' \
         "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
 
+    # Add role mapper
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "role-attribute-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "config": {
+                "user.attribute": "role",
+                "claim.name": "role",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+
     # Add hasPin mapper
     curl -k -X POST \
         -H "Authorization: Bearer $TOKEN" \
