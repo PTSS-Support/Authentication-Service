@@ -32,7 +32,7 @@ func (cu *CookieUtil) SetAuthCookies(ctx *gin.Context, accessToken, refreshToken
 		cu.config.Auth.RefreshTokenCookie,
 		refreshToken,
 		cu.config.Auth.RefreshTokenDuration,
-		cu.config.Auth.CookiePathAuth,
+		cu.config.Auth.CookiePathRoot,
 		cu.config.Auth.CookieDomain,
 		cu.config.Auth.SecureRefreshTokenFlag,
 		cu.config.Auth.HttpOnlyRefreshTokenFlag,
