@@ -66,6 +66,7 @@ if [ "$REALM_EXISTS" = "404" ]; then
         -H "Content-Type: application/json" \
         -d '{
               "realm":"'"${KEYCLOAK_REALM}"'",
+              "revokeRefreshToken":true,
               "enabled":true,
               "accessTokenLifespan":1200,
               "ssoSessionIdleTimeout":2592000,

@@ -58,12 +58,13 @@ if [ "$REALM_EXISTS" = "404" ]; then
         -d '{
               "realm":"'"${KEYCLOAK_REALM}"'",
               "enabled":true,
+              "revokeRefreshToken":true,
               "accessTokenLifespan":1200,
               "ssoSessionIdleTimeout":2592000,
               "ssoSessionMaxLifespan":2592000,
               "offlineSessionIdleTimeout":2592000,
               "offlineSessionMaxLifespan":2592000,
-              "refreshTokenMaxReuse":0,
+              "refreshTokenMaxReuse":20,
               "accessTokenLifespanForImplicitFlow":1200
                 }' \
         "${KEYCLOAK_BASE_URL}/admin/realms"
