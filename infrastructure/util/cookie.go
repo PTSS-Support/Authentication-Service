@@ -49,7 +49,6 @@ func (cu *CookieUtil) ClearAuthCookies(ctx *gin.Context) {
 		cu.config.Auth.SecureAccesTokenFlag,
 		cu.config.Auth.HttpOnlyAccesTokenFlag,
 	)
-	cu.SetAuthCookies(ctx, "", "")
 
 	ctx.SetCookie(
 		cu.config.Auth.RefreshTokenCookie,
