@@ -16,6 +16,7 @@ import (
 
 type AuthService interface {
 	Login(ctx context.Context, req *requests.LoginRequest) (*responses.TokenPair, error)
+	Logout(ctx context.Context, refreshToken string) error
 	ValidateAndRefreshIfNeeded(ctx context.Context, accessToken, refreshToken string) (*responses.TokenPair, error)
 	ValidateLoginRequest(req *requests.LoginRequest) error
 	ValidateAndIntrospectRefreshToken(ctx context.Context, refreshToken string) (*responses.TokenIntrospectionResponse, error)
@@ -43,6 +44,17 @@ func (s *authService) Login(ctx context.Context, req *requests.LoginRequest) (*r
 		return nil, err
 	}
 	return s.authRepo.Login(ctx, req)
+}
+
+func (s *authService) Logout(ctx context.Context, refreshToken string) error {
+	log := s.logger.WithContext(ctx)
+
+	if refreshToken == "" {
+		log.Info("No refresh token provided for logout")
+		return nil
+	}
+
+	return s.authRepo.Logout(ctx, refreshToken)
 }
 
 func (s *authService) ValidateAndIntrospectRefreshToken(ctx context.Context, refreshToken string) (*responses.TokenIntrospectionResponse, error) {

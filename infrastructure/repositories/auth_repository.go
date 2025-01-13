@@ -16,6 +16,7 @@ import (
 
 type AuthRepository interface {
 	Login(ctx context.Context, req *requests.LoginRequest) (*entities.TokenPair, error)
+	Logout(ctx context.Context, refreshToken string) error
 	IntrospectToken(ctx context.Context, token string) (*entities.TokenIntrospectionResponse, error)
 	RefreshTokens(ctx context.Context, refreshToken string) (*entities.TokenPair, error)
 }
@@ -56,6 +57,32 @@ func (r *authRepository) Login(ctx context.Context, req *requests.LoginRequest) 
 	}
 
 	return &authResponse, nil
+}
+
+func (r *authRepository) Logout(ctx context.Context, refreshToken string) error {
+	log := r.logger.WithContext(ctx)
+	logoutURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/logout",
+		r.config.BaseURL, r.config.Realm)
+
+	data := url.Values{}
+	data.Set("client_id", r.config.ClientID)
+	data.Set("client_secret", r.config.ClientSecret)
+	data.Set("refresh_token", refreshToken)
+
+	resp, err := r.makeRequest(ctx, "POST", logoutURL, data)
+	if err != nil {
+		log.Error("Logout request failed", "error", err)
+		return errors.ErrConnectionFailed
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		log.Error("Unexpected status code from logout endpoint",
+			"statusCode", resp.StatusCode)
+		return errors.ErrInvalidResponse
+	}
+
+	return nil
 }
 
 func (r *authRepository) IntrospectToken(ctx context.Context, token string) (*entities.TokenIntrospectionResponse, error) {

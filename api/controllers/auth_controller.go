@@ -25,6 +25,7 @@ func (c *AuthController) RegisterRoutes(r *gin.Engine) {
 	auth := r.Group("/auth")
 	{
 		auth.POST("/login", c.Login)
+		auth.POST("/logout", c.Logout)
 		auth.POST("/validate", c.ValidateOrRefreshTokens)
 		auth.POST("login/pin", c.ValidateWithPIN)
 	}
@@ -53,6 +54,26 @@ func (c *AuthController) Login(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
+	})
+}
+
+func (c *AuthController) Logout(ctx *gin.Context) {
+	refreshToken, _ := c.cookieUtil.GetRefreshTokenFromCookie(ctx)
+
+	err := c.authFacade.HandleLogout(ctx.Request.Context(), refreshToken)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Logout failed",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Clear the auth cookies
+	c.cookieUtil.ClearAuthCookies(ctx)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Logout successful",
 	})
 }
 

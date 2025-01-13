@@ -39,6 +39,29 @@ func (cu *CookieUtil) SetAuthCookies(ctx *gin.Context, accessToken, refreshToken
 	)
 }
 
+func (cu *CookieUtil) ClearAuthCookies(ctx *gin.Context) {
+	ctx.SetCookie(
+		cu.config.Auth.AccessTokenCookie,
+		"",
+		-1,
+		cu.config.Auth.CookiePathRoot,
+		cu.config.Auth.CookieDomain,
+		cu.config.Auth.SecureAccesTokenFlag,
+		cu.config.Auth.HttpOnlyAccesTokenFlag,
+	)
+	cu.SetAuthCookies(ctx, "", "")
+
+	ctx.SetCookie(
+		cu.config.Auth.RefreshTokenCookie,
+		"",
+		-1,
+		cu.config.Auth.CookiePathRoot,
+		cu.config.Auth.CookieDomain,
+		cu.config.Auth.SecureRefreshTokenFlag,
+		cu.config.Auth.HttpOnlyRefreshTokenFlag,
+	)
+}
+
 func (cu *CookieUtil) GetAccessTokenFromCookie(ctx *gin.Context) (string, error) {
 	token, err := ctx.Cookie(cu.config.Auth.AccessTokenCookie)
 	if err != nil {
