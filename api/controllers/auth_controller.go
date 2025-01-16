@@ -60,14 +60,7 @@ func (c *AuthController) Login(ctx *gin.Context) {
 func (c *AuthController) Logout(ctx *gin.Context) {
 	refreshToken, _ := c.cookieUtil.GetRefreshTokenFromCookie(ctx)
 
-	err := c.authFacade.HandleLogout(ctx.Request.Context(), refreshToken)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Logout failed",
-			"details": err.Error(),
-		})
-		return
-	}
+	c.authFacade.HandleLogout(ctx.Request.Context(), refreshToken)
 
 	// Clear the auth cookies
 	c.cookieUtil.ClearAuthCookies(ctx)
@@ -83,7 +76,6 @@ func (c *AuthController) ValidateOrRefreshTokens(ctx *gin.Context) {
 
 	response, err := c.authFacade.HandleTokenValidation(ctx.Request.Context(), accessToken, refreshToken)
 	if err != nil {
-		// Let the global error handler deal with it
 		ctx.Error(err)
 		return
 	}
