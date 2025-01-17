@@ -2,8 +2,6 @@ package facades
 
 import (
 	"context"
-	"fmt"
-
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
 	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/identity"
 	"github.com/PTSS-Support/identity-service/core/services"
@@ -42,7 +40,7 @@ func (f *identityFacade) HandleIdentityCreation(ctx context.Context, req *reques
 	response, err := f.identityService.CreateIdentity(ctx, req, req.Password)
 	if err != nil {
 		log.Error("Failed to create identity", "error", err, "email", req.Email)
-		return nil, fmt.Errorf("failed to create user: %w", err)
+		return nil, err
 	}
 
 	log.Info("Successfully created identity", "id", response.ID, "email", req.Email)
@@ -72,7 +70,7 @@ func (f *identityFacade) HandlePasswordUpdate(ctx context.Context, id string, re
 	err = f.identityService.UpdatePassword(ctx, id, req.NewPassword)
 	if err != nil {
 		log.Error("Failed to update password", "error", err, "id", id)
-		return fmt.Errorf("failed to update password: %w", err)
+		return err
 	}
 
 	log.Info("Successfully updated password", "id", id)
@@ -87,7 +85,7 @@ func (f *identityFacade) HandlePINUpdate(ctx context.Context, id string, req *re
 	currentHash, err := f.identityService.GetCurrentPINHash(ctx, id)
 	if err != nil {
 		log.Error("Failed to get current PIN hash", "error", err, "id", id)
-		return fmt.Errorf("failed to get current PIN: %w", err)
+		return err
 	}
 
 	if currentHash == "" {
@@ -100,7 +98,7 @@ func (f *identityFacade) HandlePINUpdate(ctx context.Context, id string, req *re
 	valid, err := f.encryptionService.VerifyPIN(currentHash, req.OldPIN)
 	if err != nil {
 		log.Error("Failed to verify PIN", "error", err, "id", id)
-		return fmt.Errorf("failed to verify PIN: %w", err)
+		return err
 	}
 	if !valid {
 		log.Warn("Invalid PIN provided", "id", id)
@@ -112,14 +110,14 @@ func (f *identityFacade) HandlePINUpdate(ctx context.Context, id string, req *re
 	hashedPIN, err := f.encryptionService.HashPIN(req.NewPIN)
 	if err != nil {
 		log.Error("Failed to hash new PIN", "error", err, "id", id)
-		return fmt.Errorf("failed to hash new PIN: %w", err)
+		return err
 	}
 
 	// Update PIN
 	err = f.identityService.UpdatePIN(ctx, id, hashedPIN)
 	if err != nil {
 		log.Error("Failed to update PIN", "error", err, "id", id)
-		return fmt.Errorf("failed to update PIN: %w", err)
+		return err
 	}
 
 	log.Info("Successfully updated PIN", "id", id)
@@ -134,7 +132,7 @@ func (f *identityFacade) HandlePINCreation(ctx context.Context, id string, req *
 	hashedPIN, err := f.encryptionService.HashPIN(req.PIN)
 	if err != nil {
 		log.Error("Failed to hash PIN", "error", err, "id", id)
-		return fmt.Errorf("failed to hash PIN: %w", err)
+		return err
 	}
 
 	// Check if PIN already exists
@@ -148,7 +146,7 @@ func (f *identityFacade) HandlePINCreation(ctx context.Context, id string, req *
 	err = f.identityService.SetPIN(ctx, id, hashedPIN)
 	if err != nil {
 		log.Error("Failed to create PIN", "error", err, "id", id)
-		return fmt.Errorf("failed to create PIN: %w", err)
+		return err
 	}
 
 	log.Info("Successfully created PIN", "id", id)

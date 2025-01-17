@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
@@ -69,7 +68,7 @@ func (s *identityService) CreateIdentity(ctx context.Context, req *requests.Crea
 	createdIdentity, err := s.identityRepo.CreateIdentity(ctx, keycloakIdentity)
 	if err != nil {
 		log.Error("Failed to create identity in repository", "error", err)
-		return nil, fmt.Errorf("failed to create identity: %w", err)
+		return nil, err
 	}
 
 	log.Debug("Successfully created identity in Keycloak", "id", createdIdentity.ID)
@@ -178,7 +177,7 @@ func (s *identityService) UpdatePIN(ctx context.Context, id string, hashedPIN st
 	_, err = s.identityRepo.UpdateIdentity(ctx, identity)
 	if err != nil {
 		log.Error("Failed to update identity", "error", err)
-		return fmt.Errorf("failed to update PIN in repository: %w", err)
+		return err
 	}
 
 	return nil
