@@ -55,6 +55,10 @@ func (f *identityFacade) HandleIdentityCreation(ctx context.Context, req *identi
 		Email:    response.Email,
 		Password: req.Password,
 	})
+	if err != nil {
+		log.Error("Failed to create identity", "error", err, "email", req.Email)
+		return nil, &authResponses.TokenPair{}, fmt.Errorf("failed to login user: %w", err)
+	}
 
 	log.Info("Successfully created identity", "id", response.ID, "email", req.Email)
 	return response, tokens, nil
