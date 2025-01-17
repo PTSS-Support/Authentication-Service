@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"net/http"
 	"strings"
 
@@ -13,11 +14,13 @@ import (
 type IdentityController struct {
 	BaseController
 	identityFacade facades.IdentityFacade
+	cookieUtil     util.CookieUtil
 }
 
-func NewIdentityController(identityFacade facades.IdentityFacade) *IdentityController {
+func NewIdentityController(identityFacade facades.IdentityFacade, cookieUtil *util.CookieUtil) *IdentityController {
 	return &IdentityController{
 		identityFacade: identityFacade,
+		cookieUtil:     *cookieUtil,
 	}
 }
 
@@ -44,7 +47,7 @@ func (c *IdentityController) CreateIdentity(ctx *gin.Context) {
 		return
 	}
 
-	response, err := c.identityFacade.HandleIdentityCreation(ctx.Request.Context(), &req)
+	response, tokens, err := c.identityFacade.HandleIdentityCreation(ctx.Request.Context(), &req)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Identity creation failed",
@@ -52,6 +55,8 @@ func (c *IdentityController) CreateIdentity(ctx *gin.Context) {
 		})
 		return
 	}
+
+	c.cookieUtil.SetAuthCookies(ctx, tokens.AccessToken, tokens.RefreshToken)
 
 	ctx.JSON(http.StatusCreated, response)
 }
