@@ -30,6 +30,7 @@ func (c *IdentityController) RegisterRoutes(r *gin.Engine) {
 		identity.PATCH("/:id/password", c.UpdatePassword)
 		identity.POST("/:id/pin", c.CreatePIN)
 		identity.PATCH("/:id/pin", c.UpdatePIN)
+		identity.POST("/password-reset/validate", c.ValidatePasswordReset)
 	}
 }
 
@@ -199,4 +200,33 @@ func (c *IdentityController) UpdatePIN(ctx *gin.Context) {
 	}
 
 	ctx.Status(http.StatusNoContent)
+}
+
+func (c *IdentityController) ValidatePasswordReset(ctx *gin.Context) {
+	var req requests.ValidatePasswordResetRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request body",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	response, err := c.identityFacade.HandlePasswordResetValidation(ctx.Request.Context(), &req)
+	if err != nil {
+		status := http.StatusBadRequest
+		if err == errors.ErrUserNotFound {
+			status = http.StatusNotFound
+		} else if err == errors.ErrUnauthorizedReset {
+			status = http.StatusForbidden
+		}
+
+		ctx.JSON(status, gin.H{
+			"error":   "Password reset validation failed",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, response)
 }

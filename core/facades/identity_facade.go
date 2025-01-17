@@ -3,6 +3,7 @@ package facades
 import (
 	"context"
 	"fmt"
+	"github.com/PTSS-Support/identity-service/domain/enums"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
 	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/identity"
@@ -18,6 +19,7 @@ type IdentityFacade interface {
 	HandlePasswordUpdate(ctx context.Context, id string, req *requests.UpdatePasswordRequest) error
 	HandlePINUpdate(ctx context.Context, id string, req *requests.UpdatePINRequest) error
 	HandlePINCreation(ctx context.Context, id string, req *requests.CreatePINRequest) error
+	HandlePasswordResetValidation(ctx context.Context, req *requests.ValidatePasswordResetRequest) (*responses.ValidatePasswordResetResponse, error)
 }
 
 type identityFacade struct {
@@ -153,4 +155,27 @@ func (f *identityFacade) HandlePINCreation(ctx context.Context, id string, req *
 
 	log.Info("Successfully created PIN", "id", id)
 	return nil
+}
+
+func (f *identityFacade) HandlePasswordResetValidation(ctx context.Context, req *requests.ValidatePasswordResetRequest) (*responses.ValidatePasswordResetResponse, error) {
+	log := f.logger.WithContext(ctx)
+	log.Info("Starting password reset validation", "email", req.Email)
+
+	// Validate and get identity
+	identity, err := f.identityService.ValidatePasswordResetEligibility(ctx, req.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract role from attributes
+	roleValues := identity.Attributes["role"]
+	role := enums.Role(roleValues[0])
+
+	response := &responses.ValidatePasswordResetResponse{
+		ID:   identity.ID,
+		Role: string(role),
+	}
+
+	log.Info("Successfully validated password reset request", "id", identity.ID)
+	return response, nil
 }
