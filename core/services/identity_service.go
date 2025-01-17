@@ -25,6 +25,7 @@ type IdentityService interface {
 	UpdatePIN(ctx context.Context, id string, hashedPIN string) error
 	SetPIN(ctx context.Context, id string, hashedPIN string) error
 	GetHashedPIN(ctx context.Context, userID string) (string, error)
+	ResetPassword(ctx context.Context, id string, newPassword string) error
 }
 
 type identityService struct {
@@ -223,4 +224,19 @@ func (s *identityService) GetHashedPIN(ctx context.Context, userID string) (stri
 	}
 
 	return pinValues[0], nil
+}
+
+func (s *identityService) ResetPassword(ctx context.Context, id string, newPassword string) error {
+	log := s.logger.WithContext(ctx)
+	log.Info("Starting password reset process", "id", id)
+
+	// Optional: Add password complexity checks if needed
+	err := s.identityRepo.ResetPassword(ctx, id, newPassword)
+	if err != nil {
+		log.Error("Failed to reset password", "error", err, "id", id)
+		return fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	log.Info("Successfully reset password", "id", id)
+	return nil
 }

@@ -18,6 +18,7 @@ type IdentityFacade interface {
 	HandlePasswordUpdate(ctx context.Context, id string, req *requests.UpdatePasswordRequest) error
 	HandlePINUpdate(ctx context.Context, id string, req *requests.UpdatePINRequest) error
 	HandlePINCreation(ctx context.Context, id string, req *requests.CreatePINRequest) error
+	HandlePasswordReset(ctx context.Context, id string, req *requests.ResetPasswordRequest) error
 }
 
 type identityFacade struct {
@@ -152,5 +153,20 @@ func (f *identityFacade) HandlePINCreation(ctx context.Context, id string, req *
 	}
 
 	log.Info("Successfully created PIN", "id", id)
+	return nil
+}
+
+func (f *identityFacade) HandlePasswordReset(ctx context.Context, id string, req *requests.ResetPasswordRequest) error {
+	log := f.logger.WithContext(ctx)
+	log.Info("Starting password reset process", "id", id)
+
+	// Reset password
+	err := f.identityService.ResetPassword(ctx, id, req.NewPassword)
+	if err != nil {
+		log.Error("Failed to reset password", "error", err, "id", id)
+		return err
+	}
+
+	log.Info("Successfully reset password", "id", id)
 	return nil
 }

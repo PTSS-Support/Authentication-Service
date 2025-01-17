@@ -21,6 +21,7 @@ type IdentityRepository interface {
 	DeleteIdentity(ctx context.Context, id string) error
 	VerifyPassword(ctx context.Context, username string, password string) error
 	UpdatePassword(ctx context.Context, id string, newPassword string) error
+	ResetPassword(ctx context.Context, id string, newPassword string) error
 }
 
 type identityRepository struct {
@@ -284,4 +285,33 @@ func (r *identityRepository) handleNonSuccessResponse(resp *http.Response) error
 
 func (r *identityRepository) extractUserIDFromLocation(location string) string {
 	return location[strings.LastIndex(location, "/")+1:]
+}
+
+func (r *identityRepository) ResetPassword(ctx context.Context, id string, newPassword string) error {
+	log := r.logger.WithContext(ctx)
+
+	resetURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/reset-password", r.config.BaseURL, r.config.Realm, id)
+
+	resetData := map[string]interface{}{
+		"type":      "password",
+		"value":     newPassword,
+		"temporary": false,
+	}
+
+	resp, err := r.makeJSONRequest(ctx, "PUT", resetURL, resetData)
+	if err != nil {
+		log.Error("Failed to reset password", "error", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		log.Error("Failed to reset password",
+			"statusCode", resp.StatusCode,
+			"response", string(body))
+		return fmt.Errorf("failed to reset password: %d", resp.StatusCode)
+	}
+
+	return nil
 }

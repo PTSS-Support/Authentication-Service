@@ -30,6 +30,7 @@ func (c *IdentityController) RegisterRoutes(r *gin.Engine) {
 		identity.PATCH("/:id/password", c.UpdatePassword)
 		identity.POST("/:id/pin", c.CreatePIN)
 		identity.PATCH("/:id/pin", c.UpdatePIN)
+		identity.PATCH("/:id/reset-password", c.ResetPassword)
 	}
 }
 
@@ -194,6 +195,33 @@ func (c *IdentityController) UpdatePIN(ctx *gin.Context) {
 		ctx.JSON(status, gin.H{
 			"error":   "PIN update failed",
 			"details": details,
+		})
+		return
+	}
+
+	ctx.Status(http.StatusNoContent)
+}
+
+func (c *IdentityController) ResetPassword(ctx *gin.Context) {
+	id := ctx.Param("id")
+	if !c.validateUUID(ctx, id) {
+		return
+	}
+
+	var req requests.ResetPasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request body",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	err := c.identityFacade.HandlePasswordReset(ctx.Request.Context(), id, &req)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Password reset failed",
+			"details": err.Error(),
 		})
 		return
 	}
