@@ -229,7 +229,6 @@ func (s *identityService) GetHashedPIN(ctx context.Context, userID string) (stri
 
 func (s *identityService) ValidatePasswordResetEligibility(ctx context.Context, email string) (*entities.KeycloakIdentity, error) {
 	log := s.logger.WithContext(ctx)
-	log.Info("Validating password reset eligibility", "email", email)
 
 	// Get user details by email
 	identity, err := s.GetIdentityByEmail(ctx, email)

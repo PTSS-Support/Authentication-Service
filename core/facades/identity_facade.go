@@ -168,7 +168,6 @@ func (f *identityFacade) HandlePINCreation(ctx context.Context, id string, req *
 
 func (f *identityFacade) HandlePasswordResetValidation(ctx context.Context, req *identityRequests.ValidatePasswordResetRequest) (*identityResponses.ValidatePasswordResetResponse, error) {
 	log := f.logger.WithContext(ctx)
-	log.Info("Starting password reset validation", "email", req.Email)
 
 	// Validate and get identity
 	identity, err := f.identityService.ValidatePasswordResetEligibility(ctx, req.Email)

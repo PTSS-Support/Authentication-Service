@@ -289,7 +289,6 @@ func (r *identityRepository) extractUserIDFromLocation(location string) string {
 
 func (r *identityRepository) GetIdentityByEmail(ctx context.Context, email string) (*entities.KeycloakIdentity, error) {
 	log := r.logger.WithContext(ctx)
-	log.Debug("Getting identity from Keycloak by email", "email", email)
 
 	token, err := r.getAdminToken(ctx)
 	if err != nil {
