@@ -13,6 +13,7 @@ import (
 
 type AuthFacade interface {
 	HandleLogin(ctx context.Context, req *requests.LoginRequest) (*responses.TokenPair, error)
+	HandleLogout(ctx context.Context, refreshToken string) error
 	HandleTokenValidation(ctx context.Context, accessToken, refreshToken string) (*responses.TokenPair, error)
 	HandlePINValidation(ctx context.Context, refreshToken, pin string) (*responses.TokenPair, error)
 }
@@ -38,6 +39,18 @@ func NewAuthFacade(authService services.AuthService,
 
 func (f *authFacade) HandleLogin(ctx context.Context, req *requests.LoginRequest) (*responses.TokenPair, error) {
 	return f.authService.Login(ctx, req)
+}
+
+func (f *authFacade) HandleLogout(ctx context.Context, refreshToken string) error {
+	log := f.logger.WithContext(ctx)
+
+	if refreshToken == "" {
+		log.Info("No refresh token provided for logout")
+		//still return nil to avoid confusion
+		return nil
+	}
+
+	return f.authService.Logout(ctx, refreshToken)
 }
 
 func (f *authFacade) HandleTokenValidation(ctx context.Context, accessToken, refreshToken string) (*responses.TokenPair, error) {
