@@ -21,6 +21,7 @@ type IdentityRepository interface {
 	DeleteIdentity(ctx context.Context, id string) error
 	VerifyPassword(ctx context.Context, username string, password string) error
 	UpdatePassword(ctx context.Context, id string, newPassword string) error
+	GetIdentityByEmail(ctx context.Context, email string) (*entities.KeycloakIdentity, error)
 }
 
 type identityRepository struct {
@@ -284,4 +285,54 @@ func (r *identityRepository) handleNonSuccessResponse(resp *http.Response) error
 
 func (r *identityRepository) extractUserIDFromLocation(location string) string {
 	return location[strings.LastIndex(location, "/")+1:]
+}
+
+func (r *identityRepository) GetIdentityByEmail(ctx context.Context, email string) (*entities.KeycloakIdentity, error) {
+	log := r.logger.WithContext(ctx)
+
+	token, err := r.getAdminToken(ctx)
+	if err != nil {
+		log.Error("Failed to get admin token", "error", err)
+		return nil, err
+	}
+
+	// Keycloak requires URL-encoded email for the query
+	encodedEmail := url.QueryEscape(email)
+	usersURL := fmt.Sprintf("%s/admin/realms/%s/users?email=%s&exact=true",
+		r.config.BaseURL, r.config.Realm, encodedEmail)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", usersURL, nil)
+	if err != nil {
+		log.Error("Failed to create request", "error", err)
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		log.Error("Failed to get user", "error", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Error("Failed to get user",
+			"statusCode", resp.StatusCode,
+			"response", string(body))
+		return nil, fmt.Errorf("failed to get user: %d", resp.StatusCode)
+	}
+
+	var users []entities.KeycloakIdentity
+	if err := json.NewDecoder(resp.Body).Decode(&users); err != nil {
+		log.Error("Failed to decode response", "error", err)
+		return nil, err
+	}
+
+	if len(users) == 0 {
+		return nil, errors.ErrUserNotFound
+	}
+
+	return &users[0], nil
 }
