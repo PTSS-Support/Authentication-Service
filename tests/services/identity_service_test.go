@@ -60,7 +60,14 @@ func (m *MockIdentityRepository) UpdatePassword(ctx context.Context, id string, 
 	return args.Error(0)
 }
 
-// MockLogger is a mock implementation of Logger
+func (m *MockIdentityRepository) GetIdentityByEmail(ctx context.Context, email string) (*entities.KeycloakIdentity, error) {
+	args := m.Called(ctx, email)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entities.KeycloakIdentity), args.Error(1)
+}
+
 type MockLogger struct {
 	mock.Mock
 }

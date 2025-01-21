@@ -43,6 +43,17 @@ jobs:
           clean: true
           continue-on-error: true
 
+      - name: Run Unit Tests
+        run: |
+          go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: Upload Coverage Reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.txt
+          flags: unittests
+          fail_ci_if_error: true
+
       - name: Build
         run: |
           cd cmd 
@@ -202,7 +213,7 @@ jobs:
 
       - name: Run k6 Performance Tests
         run: |
-          ROUTE_HOST=${{ needs.deploy.outputs.route_host }} k6 run tests/k6/*.js
+          ROUTE_HOST=${{ needs.deploy.outputs.route_host }} k6 run main.js
 
       - name: Run E2E Tests
         run: |

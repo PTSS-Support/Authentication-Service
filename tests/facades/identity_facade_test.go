@@ -2,170 +2,124 @@ package facades_test
 
 import (
 	"context"
-	"github.com/PTSS-Support/identity-service/infrastructure/util"
+	authRequests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
+	"github.com/PTSS-Support/identity-service/domain/entities"
+	"github.com/PTSS-Support/identity-service/tests/mocks"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
-	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/identity"
+	identityRequests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
+	identityResponses "github.com/PTSS-Support/identity-service/api/dtos/responses/identity"
 	"github.com/PTSS-Support/identity-service/core/facades"
 	"github.com/PTSS-Support/identity-service/domain/enums"
 	"github.com/PTSS-Support/identity-service/domain/errors"
 )
 
-// Mock Services
-type MockIdentityService struct {
-	mock.Mock
-}
-
-func (m *MockIdentityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword string) (*responses.IdentityResponse, error) {
-	args := m.Called(ctx, req, hashedPassword)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*responses.IdentityResponse), args.Error(1)
-}
-
-func (m *MockIdentityService) UpdateRole(ctx context.Context, id string, req *requests.UpdateRoleRequest) (*responses.IdentityResponse, error) {
-	args := m.Called(ctx, id, req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*responses.IdentityResponse), args.Error(1)
-}
-
-func (m *MockIdentityService) DeleteIdentity(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
-}
-
-func (m *MockIdentityService) VerifyPassword(ctx context.Context, id string, password string) error {
-	args := m.Called(ctx, id, password)
-	return args.Error(0)
-}
-
-func (m *MockIdentityService) UpdatePassword(ctx context.Context, id string, newPassword string) error {
-	args := m.Called(ctx, id, newPassword)
-	return args.Error(0)
-}
-
-func (m *MockIdentityService) GetCurrentPINHash(ctx context.Context, id string) (string, error) {
-	args := m.Called(ctx, id)
-	return args.String(0), args.Error(1)
-}
-
-func (m *MockIdentityService) UpdatePIN(ctx context.Context, id string, hashedPIN string) error {
-	args := m.Called(ctx, id, hashedPIN)
-	return args.Error(0)
-}
-
-func (m *MockIdentityService) SetPIN(ctx context.Context, id string, hashedPIN string) error {
-	args := m.Called(ctx, id, hashedPIN)
-	return args.Error(0)
-}
-
-func (m *MockIdentityService) GetHashedPIN(ctx context.Context, userID string) (string, error) {
-	args := m.Called(ctx, userID)
-	return args.String(0), args.Error(1)
-}
-
-type MockEncryptionService struct {
-	mock.Mock
-}
-
-func (m *MockEncryptionService) HashPIN(pin string) (string, error) {
-	args := m.Called(pin)
-	return args.String(0), args.Error(1)
-}
-
-func (m *MockEncryptionService) VerifyPIN(hashedPIN string, pin string) (bool, error) {
-	args := m.Called(hashedPIN, pin)
-	return args.Bool(0), args.Error(1)
-}
-
-// Mock Logger
-type MockLogger struct {
-	mock.Mock
-}
-
-func (m *MockLogger) Debug(msg string, args ...interface{}) {}
-func (m *MockLogger) Info(msg string, args ...interface{})  {}
-func (m *MockLogger) Warn(msg string, args ...interface{})  {}
-func (m *MockLogger) Error(msg string, args ...interface{}) {}
-func (m *MockLogger) WithContext(ctx context.Context) util.Logger {
-	return m
-}
-
-type MockLoggerFactory struct{}
-
-func (m *MockLoggerFactory) NewLogger(name string) util.Logger {
-	return &MockLogger{}
-}
-
 func TestHandleIdentityCreation(t *testing.T) {
 	tests := []struct {
-		name          string
-		request       *requests.CreateIdentityRequest
-		mockSetup     func(*MockIdentityService, *MockEncryptionService)
-		expectedResp  *responses.IdentityResponse
-		expectedError error
+		name           string
+		request        *identityRequests.CreateIdentityRequest
+		mockSetup      func(*mocks.MockIdentityService, *mocks.MockEncryptionService, *mocks.MockAuthService)
+		expectedResp   *identityResponses.IdentityResponse
+		expectedTokens *entities.TokenPair
+		expectedError  error
 	}{
 		{
-			name: "Successful identity creation",
-			request: &requests.CreateIdentityRequest{
+			name: "Successful identity creation and login",
+			request: &identityRequests.CreateIdentityRequest{
 				Email:     "test@example.com",
 				Password:  "password123",
 				Role:      enums.RoleAdmin,
 				FirstName: "Test",
 				LastName:  "User",
 			},
-			mockSetup: func(identityService *MockIdentityService, _ *MockEncryptionService) {
-				expectedResponse := &responses.IdentityResponse{
+			mockSetup: func(identityService *mocks.MockIdentityService, _ *mocks.MockEncryptionService, authService *mocks.MockAuthService) {
+				expectedResponse := &identityResponses.IdentityResponse{
 					ID:    "user123",
 					Email: "test@example.com",
 					Role:  enums.RoleAdmin,
 				}
-				identityService.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(req *requests.CreateIdentityRequest) bool {
+				// Mock identity creation
+				identityService.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(req *identityRequests.CreateIdentityRequest) bool {
 					return req.Email == "test@example.com" && req.Role == enums.RoleAdmin
 				}), "password123").Return(expectedResponse, nil)
+
+				// Mock login
+				expectedTokens := &entities.TokenPair{
+					AccessToken:  "access-token",
+					RefreshToken: "refresh-token",
+				}
+				authService.On("Login", mock.Anything, mock.MatchedBy(func(req *authRequests.LoginRequest) bool {
+					return req.Email == "test@example.com" && req.Password == "password123"
+				})).Return(expectedTokens, nil)
 			},
-			expectedResp: &responses.IdentityResponse{
+			expectedResp: &identityResponses.IdentityResponse{
 				ID:    "user123",
 				Email: "test@example.com",
 				Role:  enums.RoleAdmin,
 			},
+			expectedTokens: &entities.TokenPair{
+				AccessToken:  "access-token",
+				RefreshToken: "refresh-token",
+			},
 		},
 		{
-			name: "Service returns error",
-			request: &requests.CreateIdentityRequest{
+			name: "Failed identity creation",
+			request: &identityRequests.CreateIdentityRequest{
 				Email:     "test@example.com",
 				Password:  "password123",
 				Role:      enums.RoleAdmin,
 				FirstName: "Test",
 				LastName:  "User",
 			},
-			mockSetup: func(identityService *MockIdentityService, _ *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, _ *mocks.MockEncryptionService, _ *mocks.MockAuthService) {
 				identityService.On("CreateIdentity", mock.Anything, mock.Anything, mock.Anything).
 					Return(nil, errors.ErrInvalidEmail)
 			},
 			expectedError: errors.ErrInvalidEmail,
+		},
+		{
+			name: "Successful creation but failed login",
+			request: &identityRequests.CreateIdentityRequest{
+				Email:     "test@example.com",
+				Password:  "password123",
+				Role:      enums.RoleAdmin,
+				FirstName: "Test",
+				LastName:  "User",
+			},
+			mockSetup: func(identityService *mocks.MockIdentityService, _ *mocks.MockEncryptionService, authService *mocks.MockAuthService) {
+				// Mock successful identity creation
+				expectedResponse := &identityResponses.IdentityResponse{
+					ID:    "user123",
+					Email: "test@example.com",
+					Role:  enums.RoleAdmin,
+				}
+				identityService.On("CreateIdentity", mock.Anything, mock.Anything, mock.Anything).
+					Return(expectedResponse, nil)
+
+				// Mock failed login
+				authService.On("Login", mock.Anything, mock.Anything).
+					Return(nil, errors.ErrKeycloakUnexpected)
+			},
+			expectedError: errors.ErrKeycloakUnexpected,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
-			mockIdentityService := new(MockIdentityService)
-			mockEncryptionService := new(MockEncryptionService)
-			tt.mockSetup(mockIdentityService, mockEncryptionService)
+			mockIdentityService := new(mocks.MockIdentityService)
+			mockEncryptionService := new(mocks.MockEncryptionService)
+			mockAuthService := new(mocks.MockAuthService)
+			tt.mockSetup(mockIdentityService, mockEncryptionService, mockAuthService)
 
-			facade := facades.NewIdentityFacade(mockIdentityService, mockEncryptionService, &MockLoggerFactory{})
+			facade := facades.NewIdentityFacade(mockIdentityService, mockEncryptionService, &mocks.MockLoggerFactory{}, mockAuthService)
 
 			// Execute
-			response, err := facade.HandleIdentityCreation(context.Background(), tt.request)
+			response, tokens, err := facade.HandleIdentityCreation(context.Background(), tt.request)
 
 			// Assert
 			if tt.expectedError != nil {
@@ -176,16 +130,21 @@ func TestHandleIdentityCreation(t *testing.T) {
 					assert.Equal(t, expectedAppErr.Code, appErr.Code)
 				}
 				assert.Nil(t, response)
+				assert.Equal(t, &entities.TokenPair{}, tokens)
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, response)
+				require.NotNil(t, tokens)
 				assert.Equal(t, tt.expectedResp.ID, response.ID)
 				assert.Equal(t, tt.expectedResp.Email, response.Email)
 				assert.Equal(t, tt.expectedResp.Role, response.Role)
+				assert.Equal(t, tt.expectedTokens.AccessToken, tokens.AccessToken)
+				assert.Equal(t, tt.expectedTokens.RefreshToken, tokens.RefreshToken)
 			}
 
 			mockIdentityService.AssertExpectations(t)
 			mockEncryptionService.AssertExpectations(t)
+			mockAuthService.AssertExpectations(t)
 		})
 	}
 }
@@ -194,17 +153,17 @@ func TestHandlePINCreation(t *testing.T) {
 	tests := []struct {
 		name          string
 		id            string
-		request       *requests.CreatePINRequest
-		mockSetup     func(*MockIdentityService, *MockEncryptionService)
+		request       *identityRequests.CreatePINRequest
+		mockSetup     func(*mocks.MockIdentityService, *mocks.MockEncryptionService)
 		expectedError error
 	}{
 		{
 			name: "Successful PIN creation",
 			id:   "user123",
-			request: &requests.CreatePINRequest{
+			request: &identityRequests.CreatePINRequest{
 				PIN: "1234",
 			},
-			mockSetup: func(identityService *MockIdentityService, encryptionService *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, encryptionService *mocks.MockEncryptionService) {
 				// Check current PIN doesn't exist
 				identityService.On("GetCurrentPINHash", mock.Anything, "user123").
 					Return("", nil)
@@ -221,10 +180,10 @@ func TestHandlePINCreation(t *testing.T) {
 		{
 			name: "PIN already exists",
 			id:   "user123",
-			request: &requests.CreatePINRequest{
+			request: &identityRequests.CreatePINRequest{
 				PIN: "1234",
 			},
-			mockSetup: func(identityService *MockIdentityService, encryptionService *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, encryptionService *mocks.MockEncryptionService) {
 				// Hash the PIN first (this happens in the implementation before checking existence)
 				encryptionService.On("HashPIN", "1234").
 					Return("hashedPin123", nil)
@@ -238,10 +197,10 @@ func TestHandlePINCreation(t *testing.T) {
 		{
 			name: "PIN hashing fails",
 			id:   "user123",
-			request: &requests.CreatePINRequest{
+			request: &identityRequests.CreatePINRequest{
 				PIN: "1234",
 			},
-			mockSetup: func(identityService *MockIdentityService, encryptionService *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, encryptionService *mocks.MockEncryptionService) {
 				// Only mock the HashPIN call since it fails and returns early
 				encryptionService.On("HashPIN", "1234").
 					Return("", errors.ErrKeycloakUnexpected)
@@ -251,10 +210,10 @@ func TestHandlePINCreation(t *testing.T) {
 		{
 			name: "Service SetPIN fails",
 			id:   "user123",
-			request: &requests.CreatePINRequest{
+			request: &identityRequests.CreatePINRequest{
 				PIN: "1234",
 			},
-			mockSetup: func(identityService *MockIdentityService, encryptionService *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, encryptionService *mocks.MockEncryptionService) {
 				// No existing PIN
 				identityService.On("GetCurrentPINHash", mock.Anything, "user123").
 					Return("", nil)
@@ -274,11 +233,12 @@ func TestHandlePINCreation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
-			mockIdentityService := new(MockIdentityService)
-			mockEncryptionService := new(MockEncryptionService)
+			mockIdentityService := new(mocks.MockIdentityService)
+			mockEncryptionService := new(mocks.MockEncryptionService)
+			mockAuthService := new(mocks.MockAuthService)
 			tt.mockSetup(mockIdentityService, mockEncryptionService)
 
-			facade := facades.NewIdentityFacade(mockIdentityService, mockEncryptionService, &MockLoggerFactory{})
+			facade := facades.NewIdentityFacade(mockIdentityService, mockEncryptionService, &mocks.MockLoggerFactory{}, mockAuthService)
 
 			// Execute
 			err := facade.HandlePINCreation(context.Background(), tt.id, tt.request)
@@ -305,18 +265,18 @@ func TestHandlePINUpdate(t *testing.T) {
 	tests := []struct {
 		name          string
 		id            string
-		request       *requests.UpdatePINRequest
-		mockSetup     func(*MockIdentityService, *MockEncryptionService)
+		request       *identityRequests.UpdatePINRequest
+		mockSetup     func(*mocks.MockIdentityService, *mocks.MockEncryptionService)
 		expectedError error
 	}{
 		{
 			name: "Successful PIN update",
 			id:   "user123",
-			request: &requests.UpdatePINRequest{
+			request: &identityRequests.UpdatePINRequest{
 				OldPIN: "1234",
 				NewPIN: "5678",
 			},
-			mockSetup: func(identityService *MockIdentityService, encryptionService *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, encryptionService *mocks.MockEncryptionService) {
 				// Get current PIN hash
 				identityService.On("GetCurrentPINHash", mock.Anything, "user123").
 					Return("currentHashedPin", nil)
@@ -337,11 +297,11 @@ func TestHandlePINUpdate(t *testing.T) {
 		{
 			name: "No existing PIN",
 			id:   "user123",
-			request: &requests.UpdatePINRequest{
+			request: &identityRequests.UpdatePINRequest{
 				OldPIN: "1234",
 				NewPIN: "5678",
 			},
-			mockSetup: func(identityService *MockIdentityService, _ *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, _ *mocks.MockEncryptionService) {
 				// No existing PIN
 				identityService.On("GetCurrentPINHash", mock.Anything, "user123").
 					Return("", nil)
@@ -351,11 +311,11 @@ func TestHandlePINUpdate(t *testing.T) {
 		{
 			name: "Invalid old PIN",
 			id:   "user123",
-			request: &requests.UpdatePINRequest{
+			request: &identityRequests.UpdatePINRequest{
 				OldPIN: "wrong",
 				NewPIN: "5678",
 			},
-			mockSetup: func(identityService *MockIdentityService, encryptionService *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, encryptionService *mocks.MockEncryptionService) {
 				// Get current PIN hash
 				identityService.On("GetCurrentPINHash", mock.Anything, "user123").
 					Return("currentHashedPin", nil)
@@ -369,11 +329,11 @@ func TestHandlePINUpdate(t *testing.T) {
 		{
 			name: "PIN hashing fails",
 			id:   "user123",
-			request: &requests.UpdatePINRequest{
+			request: &identityRequests.UpdatePINRequest{
 				OldPIN: "1234",
 				NewPIN: "5678",
 			},
-			mockSetup: func(identityService *MockIdentityService, encryptionService *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, encryptionService *mocks.MockEncryptionService) {
 				// Get current PIN hash
 				identityService.On("GetCurrentPINHash", mock.Anything, "user123").
 					Return("currentHashedPin", nil)
@@ -391,11 +351,11 @@ func TestHandlePINUpdate(t *testing.T) {
 		{
 			name: "Service update fails",
 			id:   "user123",
-			request: &requests.UpdatePINRequest{
+			request: &identityRequests.UpdatePINRequest{
 				OldPIN: "1234",
 				NewPIN: "5678",
 			},
-			mockSetup: func(identityService *MockIdentityService, encryptionService *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, encryptionService *mocks.MockEncryptionService) {
 				// Get current PIN hash
 				identityService.On("GetCurrentPINHash", mock.Anything, "user123").
 					Return("currentHashedPin", nil)
@@ -417,11 +377,11 @@ func TestHandlePINUpdate(t *testing.T) {
 		{
 			name: "PIN verification throws error",
 			id:   "user123",
-			request: &requests.UpdatePINRequest{
+			request: &identityRequests.UpdatePINRequest{
 				OldPIN: "1234",
 				NewPIN: "5678",
 			},
-			mockSetup: func(identityService *MockIdentityService, encryptionService *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, encryptionService *mocks.MockEncryptionService) {
 				// Get current PIN hash
 				identityService.On("GetCurrentPINHash", mock.Anything, "user123").
 					Return("currentHashedPin", nil)
@@ -437,11 +397,12 @@ func TestHandlePINUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
-			mockIdentityService := new(MockIdentityService)
-			mockEncryptionService := new(MockEncryptionService)
+			mockIdentityService := new(mocks.MockIdentityService)
+			mockEncryptionService := new(mocks.MockEncryptionService)
+			mockAuthService := new(mocks.MockAuthService)
 			tt.mockSetup(mockIdentityService, mockEncryptionService)
 
-			facade := facades.NewIdentityFacade(mockIdentityService, mockEncryptionService, &MockLoggerFactory{})
+			facade := facades.NewIdentityFacade(mockIdentityService, mockEncryptionService, &mocks.MockLoggerFactory{}, mockAuthService)
 
 			// Execute
 			err := facade.HandlePINUpdate(context.Background(), tt.id, tt.request)
@@ -468,18 +429,18 @@ func TestHandlePasswordUpdate(t *testing.T) {
 	tests := []struct {
 		name          string
 		id            string
-		request       *requests.UpdatePasswordRequest
-		mockSetup     func(*MockIdentityService, *MockEncryptionService)
+		request       *identityRequests.UpdatePasswordRequest
+		mockSetup     func(*mocks.MockIdentityService, *mocks.MockEncryptionService)
 		expectedError error
 	}{
 		{
 			name: "Successful password update",
 			id:   "user123",
-			request: &requests.UpdatePasswordRequest{
+			request: &identityRequests.UpdatePasswordRequest{
 				OldPassword: "oldPass123",
 				NewPassword: "newPass123",
 			},
-			mockSetup: func(identityService *MockIdentityService, _ *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, _ *mocks.MockEncryptionService) {
 				// Verify old password
 				identityService.On("VerifyPassword", mock.Anything, "user123", "oldPass123").
 					Return(nil)
@@ -491,11 +452,11 @@ func TestHandlePasswordUpdate(t *testing.T) {
 		{
 			name: "Old password verification fails",
 			id:   "user123",
-			request: &requests.UpdatePasswordRequest{
+			request: &identityRequests.UpdatePasswordRequest{
 				OldPassword: "wrongPass",
 				NewPassword: "newPass123",
 			},
-			mockSetup: func(identityService *MockIdentityService, _ *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, _ *mocks.MockEncryptionService) {
 				identityService.On("VerifyPassword", mock.Anything, "user123", "wrongPass").
 					Return(errors.ErrInvalidCredentials)
 			},
@@ -504,11 +465,11 @@ func TestHandlePasswordUpdate(t *testing.T) {
 		{
 			name: "Password update fails",
 			id:   "user123",
-			request: &requests.UpdatePasswordRequest{
+			request: &identityRequests.UpdatePasswordRequest{
 				OldPassword: "oldPass123",
 				NewPassword: "newPass123",
 			},
-			mockSetup: func(identityService *MockIdentityService, _ *MockEncryptionService) {
+			mockSetup: func(identityService *mocks.MockIdentityService, _ *mocks.MockEncryptionService) {
 				// Verify old password succeeds
 				identityService.On("VerifyPassword", mock.Anything, "user123", "oldPass123").
 					Return(nil)
@@ -523,11 +484,12 @@ func TestHandlePasswordUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
-			mockIdentityService := new(MockIdentityService)
-			mockEncryptionService := new(MockEncryptionService)
+			mockIdentityService := new(mocks.MockIdentityService)
+			mockEncryptionService := new(mocks.MockEncryptionService)
+			mockAuthService := new(mocks.MockAuthService)
 			tt.mockSetup(mockIdentityService, mockEncryptionService)
 
-			facade := facades.NewIdentityFacade(mockIdentityService, mockEncryptionService, &MockLoggerFactory{})
+			facade := facades.NewIdentityFacade(mockIdentityService, mockEncryptionService, &mocks.MockLoggerFactory{}, mockAuthService)
 
 			// Execute
 			err := facade.HandlePasswordUpdate(context.Background(), tt.id, tt.request)
