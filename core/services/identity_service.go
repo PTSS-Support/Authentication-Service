@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	"strings"
-
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
 	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/identity"
 	"github.com/PTSS-Support/identity-service/domain/entities"
@@ -43,15 +41,19 @@ func NewIdentityService(identityRepo repositories.IdentityRepository, loggerFact
 
 func (s *identityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword string) (*responses.IdentityResponse, error) {
 	log := s.logger.WithContext(ctx)
-	sanitizedRole := strings.ReplaceAll(string(req.Role), "\n", "")
-	sanitizedRole = strings.ReplaceAll(sanitizedRole, "\r", "")
-	log.Info("Creating new identity", "email", req.Email, "role", sanitizedRole)
+	log.Info("Creating new identity", "email", req.Email, "role", req.Role)
 
 	if req.Role != enums.RoleHealthcareProfessional && req.Role != enums.RoleAdmin {
 		if req.GroupID == "" {
-			log.Error("GroupID is required for this role", "role", sanitizedRole)
+			log.Error("GroupID is required for this role", "role", req.Role)
 			return nil, errors.ErrGroupIDRequired
 		}
+	}
+
+	existingUser, err := s.identityRepo.GetIdentityByEmail(ctx, req.Email)
+	if err == nil && existingUser != nil {
+		log.Error("User already exists", "email", req.Email)
+		return nil, errors.ErrUserAlreadyExists
 	}
 
 	// Create domain model

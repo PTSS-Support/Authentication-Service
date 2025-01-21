@@ -31,6 +31,13 @@ var (
 		StatusCode:    http.StatusConflict,
 	}
 
+	ErrUserAlreadyExists = &AppError{
+		Code:          "USER_EXISTS",
+		Err:           errors.New("User with this email already exists"),
+		ClientMessage: "User with this email already exists. Please log in or use a different email address.",
+		StatusCode:    http.StatusConflict,
+	}
+
 	ErrWrongPin = &AppError{
 		Code:          "WRONG_PIN",
 		Err:           errors.New("wrong PIN entered"),
