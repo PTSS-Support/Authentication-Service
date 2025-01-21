@@ -135,4 +135,25 @@ var (
 		ClientMessage: "PIN must contain only numbers",
 		StatusCode:    http.StatusBadRequest,
 	}
+
+	ErrUserNotFound = &AppError{
+		Code:          "USER_NOT_FOUND",
+		Err:           errors.New("user not found"),
+		ClientMessage: "The user account could not be found. Please check the email address and try again.",
+		StatusCode:    http.StatusNotFound,
+	}
+
+	ErrUnauthorizedReset = &AppError{
+		Code:          "UNAUTHORISED_RESET",
+		Err:           errors.New("unauthorised password reset"),
+		ClientMessage: "You are not authorised to reset this password.",
+		StatusCode:    http.StatusForbidden,
+	}
+
+	ErrRoleLacksPermission = &AppError{
+		Code:          "ROLE_LACKS_PERMISSION",
+		Err:           errors.New("role lacks permission"),
+		ClientMessage: "This role does not have permission to forget password.",
+		StatusCode:    http.StatusForbidden,
+	}
 )

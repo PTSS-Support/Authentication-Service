@@ -2,37 +2,45 @@ package facades
 
 import (
 	"context"
-	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
-	responses "github.com/PTSS-Support/identity-service/api/dtos/responses/identity"
+	"fmt"
+	"github.com/PTSS-Support/identity-service/domain/enums"
+
+	authRequests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
+	identityRequests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
+	identityResponses "github.com/PTSS-Support/identity-service/api/dtos/responses/identity"
 	"github.com/PTSS-Support/identity-service/core/services"
+	authResponses "github.com/PTSS-Support/identity-service/domain/entities"
 	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
 )
 
 type IdentityFacade interface {
-	HandleIdentityCreation(ctx context.Context, req *requests.CreateIdentityRequest) (*responses.IdentityResponse, error)
-	HandleRoleUpdate(ctx context.Context, id string, req *requests.UpdateRoleRequest) (*responses.IdentityResponse, error)
+	HandleIdentityCreation(ctx context.Context, req *identityRequests.CreateIdentityRequest) (*identityResponses.IdentityResponse, *authResponses.TokenPair, error)
+	HandleRoleUpdate(ctx context.Context, id string, req *identityRequests.UpdateRoleRequest) (*identityResponses.IdentityResponse, error)
 	HandleIdentityDeletion(ctx context.Context, id string) error
-	HandlePasswordUpdate(ctx context.Context, id string, req *requests.UpdatePasswordRequest) error
-	HandlePINUpdate(ctx context.Context, id string, req *requests.UpdatePINRequest) error
-	HandlePINCreation(ctx context.Context, id string, req *requests.CreatePINRequest) error
+	HandlePasswordUpdate(ctx context.Context, id string, req *identityRequests.UpdatePasswordRequest) error
+	HandlePINUpdate(ctx context.Context, id string, req *identityRequests.UpdatePINRequest) error
+	HandlePINCreation(ctx context.Context, id string, req *identityRequests.CreatePINRequest) error
+	HandlePasswordResetValidation(ctx context.Context, req *identityRequests.ValidatePasswordResetRequest) (*identityResponses.ValidatePasswordResetResponse, error)
 }
 
 type identityFacade struct {
 	identityService   services.IdentityService
 	encryptionService services.EncryptionService
+	authService       services.AuthService
 	logger            util.Logger
 }
 
-func NewIdentityFacade(identityService services.IdentityService, encryptionService services.EncryptionService, loggerFactory util.LoggerFactory) IdentityFacade {
+func NewIdentityFacade(identityService services.IdentityService, encryptionService services.EncryptionService, loggerFactory util.LoggerFactory, authService services.AuthService) IdentityFacade {
 	return &identityFacade{
 		identityService:   identityService,
 		encryptionService: encryptionService,
+		authService:       authService,
 		logger:            loggerFactory.NewLogger("IdentityFacade"),
 	}
 }
 
-func (f *identityFacade) HandleIdentityCreation(ctx context.Context, req *requests.CreateIdentityRequest) (*responses.IdentityResponse, error) {
+func (f *identityFacade) HandleIdentityCreation(ctx context.Context, req *identityRequests.CreateIdentityRequest) (*identityResponses.IdentityResponse, *authResponses.TokenPair, error) {
 	log := f.logger.WithContext(ctx)
 	log.Info("Starting identity creation process", "email", req.Email)
 
@@ -40,14 +48,23 @@ func (f *identityFacade) HandleIdentityCreation(ctx context.Context, req *reques
 	response, err := f.identityService.CreateIdentity(ctx, req, req.Password)
 	if err != nil {
 		log.Error("Failed to create identity", "error", err, "email", req.Email)
-		return nil, err
+		return nil, &authResponses.TokenPair{}, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	tokens, err := f.authService.Login(ctx, &authRequests.LoginRequest{
+		Email:    response.Email,
+		Password: req.Password,
+	})
+	if err != nil {
+		log.Error("Failed to create identity", "error", err, "email", req.Email)
+		return nil, &authResponses.TokenPair{}, fmt.Errorf("failed to login user: %w", err)
 	}
 
 	log.Info("Successfully created identity", "id", response.ID, "email", req.Email)
-	return response, nil
+	return response, tokens, nil
 }
 
-func (f *identityFacade) HandleRoleUpdate(ctx context.Context, id string, req *requests.UpdateRoleRequest) (*responses.IdentityResponse, error) {
+func (f *identityFacade) HandleRoleUpdate(ctx context.Context, id string, req *identityRequests.UpdateRoleRequest) (*identityResponses.IdentityResponse, error) {
 	return f.identityService.UpdateRole(ctx, id, req)
 }
 
@@ -55,7 +72,7 @@ func (f *identityFacade) HandleIdentityDeletion(ctx context.Context, id string) 
 	return f.identityService.DeleteIdentity(ctx, id)
 }
 
-func (f *identityFacade) HandlePasswordUpdate(ctx context.Context, id string, req *requests.UpdatePasswordRequest) error {
+func (f *identityFacade) HandlePasswordUpdate(ctx context.Context, id string, req *identityRequests.UpdatePasswordRequest) error {
 	log := f.logger.WithContext(ctx)
 	log.Info("Starting password update process", "id", id)
 
@@ -77,7 +94,7 @@ func (f *identityFacade) HandlePasswordUpdate(ctx context.Context, id string, re
 	return nil
 }
 
-func (f *identityFacade) HandlePINUpdate(ctx context.Context, id string, req *requests.UpdatePINRequest) error {
+func (f *identityFacade) HandlePINUpdate(ctx context.Context, id string, req *identityRequests.UpdatePINRequest) error {
 	log := f.logger.WithContext(ctx)
 	log.Info("Starting PIN update process", "id", id)
 
@@ -124,7 +141,7 @@ func (f *identityFacade) HandlePINUpdate(ctx context.Context, id string, req *re
 	return nil
 }
 
-func (f *identityFacade) HandlePINCreation(ctx context.Context, id string, req *requests.CreatePINRequest) error {
+func (f *identityFacade) HandlePINCreation(ctx context.Context, id string, req *identityRequests.CreatePINRequest) error {
 	log := f.logger.WithContext(ctx)
 	log.Info("Starting PIN creation process", "id", id)
 
@@ -151,4 +168,26 @@ func (f *identityFacade) HandlePINCreation(ctx context.Context, id string, req *
 
 	log.Info("Successfully created PIN", "id", id)
 	return nil
+}
+
+func (f *identityFacade) HandlePasswordResetValidation(ctx context.Context, req *identityRequests.ValidatePasswordResetRequest) (*identityResponses.ValidatePasswordResetResponse, error) {
+	log := f.logger.WithContext(ctx)
+
+	// Validate and get identity
+	identity, err := f.identityService.ValidatePasswordResetEligibility(ctx, req.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract role from attributes
+	roleValues := identity.Attributes["role"]
+	role := enums.Role(roleValues[0])
+
+	response := &identityResponses.ValidatePasswordResetResponse{
+		ID:   identity.ID,
+		Role: string(role),
+	}
+
+	log.Info("Successfully validated password reset request", "id", identity.ID)
+	return response, nil
 }
