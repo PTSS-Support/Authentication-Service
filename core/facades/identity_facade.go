@@ -193,7 +193,7 @@ func (f *identityFacade) HandlePasswordResetValidation(ctx context.Context, req 
 	return response, nil
 }
 
-func (f *identityFacade) HandlePasswordReset(ctx context.Context, id string, req *requests.ResetPasswordRequest) error {
+func (f *identityFacade) HandlePasswordReset(ctx context.Context, id string, req *identityRequests.ResetPasswordRequest) error {
 	log := f.logger.WithContext(ctx)
 	log.Info("Starting password reset process", "id", id)
 
@@ -207,4 +207,3 @@ func (f *identityFacade) HandlePasswordReset(ctx context.Context, id string, req
 	log.Info("Successfully reset password", "id", id)
 	return nil
 }
-
