@@ -38,6 +38,13 @@ var (
 		StatusCode:    http.StatusConflict,
 	}
 
+	ErrFirstnameOrLastnameInvalidFormat = &AppError{
+		Code:          "INVALID_NAME_FORMAT",
+		Err:           errors.New("invalid name format"),
+		ClientMessage: "First name and last name cannot contain special characters or numbers.",
+		StatusCode:    http.StatusConflict,
+	}
+
 	ErrWrongPin = &AppError{
 		Code:          "WRONG_PIN",
 		Err:           errors.New("wrong PIN entered"),

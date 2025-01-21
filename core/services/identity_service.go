@@ -10,6 +10,7 @@ import (
 	"github.com/PTSS-Support/identity-service/domain/models"
 	"github.com/PTSS-Support/identity-service/infrastructure/repositories"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
+	"regexp"
 )
 
 type IdentityService interface {
@@ -42,6 +43,10 @@ func NewIdentityService(identityRepo repositories.IdentityRepository, loggerFact
 func (s *identityService) CreateIdentity(ctx context.Context, req *requests.CreateIdentityRequest, hashedPassword string) (*responses.IdentityResponse, error) {
 	log := s.logger.WithContext(ctx)
 	log.Info("Creating new identity", "email", req.Email, "role", req.Role)
+
+	if err := validateName(req.FirstName, req.LastName); err != nil {
+		return nil, err
+	}
 
 	if req.Role != enums.RoleHealthcareProfessional && req.Role != enums.RoleAdmin {
 		if req.GroupID == "" {
@@ -273,5 +278,16 @@ func (s *identityService) ResetPassword(ctx context.Context, id string, newPassw
 	}
 
 	log.Info("Successfully reset password", "id", id)
+	return nil
+}
+
+func validateName(firstName, lastName string) error {
+	// More flexible validation logic
+	nameRegex := regexp.MustCompile(`^[a-zA-ZÀ-ÿ\s'-]+$`)
+
+	if !nameRegex.MatchString(firstName) || !nameRegex.MatchString(lastName) {
+		return errors.ErrFirstnameOrLastnameInvalidFormat
+	}
+
 	return nil
 }
