@@ -22,6 +22,7 @@ type IdentityFacade interface {
 	HandlePINUpdate(ctx context.Context, id string, req *identityRequests.UpdatePINRequest) error
 	HandlePINCreation(ctx context.Context, id string, req *identityRequests.CreatePINRequest) error
 	HandlePasswordResetValidation(ctx context.Context, req *identityRequests.ValidatePasswordResetRequest) (*identityResponses.ValidatePasswordResetResponse, error)
+	HandlePasswordReset(ctx context.Context, id string, req *identityRequests.ResetPasswordRequest) error
 }
 
 type identityFacade struct {
@@ -190,4 +191,19 @@ func (f *identityFacade) HandlePasswordResetValidation(ctx context.Context, req 
 
 	log.Info("Successfully validated password reset request", "id", identity.ID)
 	return response, nil
+}
+
+func (f *identityFacade) HandlePasswordReset(ctx context.Context, id string, req *identityRequests.ResetPasswordRequest) error {
+	log := f.logger.WithContext(ctx)
+	log.Info("Starting password reset process", "id", id)
+
+	// Reset password
+	err := f.identityService.ResetPassword(ctx, id, req.NewPassword)
+	if err != nil {
+		log.Error("Failed to reset password", "error", err, "id", id)
+		return err
+	}
+
+	log.Info("Successfully reset password", "id", id)
+	return nil
 }
