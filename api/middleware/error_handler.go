@@ -1,7 +1,8 @@
 package middleware
 
 import (
-	"github.com/PTSS-Support/identity-service/domain/errors"
+	"errors"
+	domainErrors "github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -27,7 +28,9 @@ func (h *ErrorHandler) Handle() gin.HandlerFunc {
 
 		err := c.Errors.Last().Err
 
-		if appErr, ok := err.(*errors.AppError); ok {
+		// Use errors.As to check for wrapped AppError
+		var appErr *domainErrors.AppError
+		if errors.As(err, &appErr) {
 			h.logger.Error("Request failed", "error", appErr.Err)
 			c.JSON(appErr.StatusCode, gin.H{
 				"code":    appErr.Code,
