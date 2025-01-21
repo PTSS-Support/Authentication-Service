@@ -3,7 +3,6 @@ package controllers
 import (
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"net/http"
-	"strings"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
 	"github.com/PTSS-Support/identity-service/core/facades"
