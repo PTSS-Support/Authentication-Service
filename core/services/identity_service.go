@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
@@ -268,7 +267,7 @@ func (s *identityService) ResetPassword(ctx context.Context, id string, newPassw
 	err := s.identityRepo.ResetPassword(ctx, id, newPassword)
 	if err != nil {
 		log.Error("Failed to reset password", "error", err, "id", id)
-		return fmt.Errorf("failed to reset password: %w", err)
+		return err
 	}
 
 	log.Info("Successfully reset password", "id", id)

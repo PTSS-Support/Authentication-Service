@@ -2,7 +2,6 @@ package facades
 
 import (
 	"context"
-	"fmt"
 	"github.com/PTSS-Support/identity-service/domain/enums"
 
 	authRequests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
@@ -49,7 +48,7 @@ func (f *identityFacade) HandleIdentityCreation(ctx context.Context, req *identi
 	response, err := f.identityService.CreateIdentity(ctx, req, req.Password)
 	if err != nil {
 		log.Error("Failed to create identity", "error", err, "email", req.Email)
-		return nil, &authResponses.TokenPair{}, fmt.Errorf("failed to create user: %w", err)
+		return nil, &authResponses.TokenPair{}, err
 	}
 
 	tokens, err := f.authService.Login(ctx, &authRequests.LoginRequest{
@@ -58,7 +57,7 @@ func (f *identityFacade) HandleIdentityCreation(ctx context.Context, req *identi
 	})
 	if err != nil {
 		log.Error("Failed to create identity", "error", err, "email", req.Email)
-		return nil, &authResponses.TokenPair{}, fmt.Errorf("failed to login user: %w", err)
+		return nil, &authResponses.TokenPair{}, err
 	}
 
 	log.Info("Successfully created identity", "id", response.ID, "email", req.Email)
