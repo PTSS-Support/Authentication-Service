@@ -2,6 +2,7 @@ package services_test
 
 import (
 	"context"
+	"github.com/PTSS-Support/identity-service/tests/mocks"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,86 +14,14 @@ import (
 	"github.com/PTSS-Support/identity-service/domain/entities"
 	"github.com/PTSS-Support/identity-service/domain/enums"
 	"github.com/PTSS-Support/identity-service/domain/errors"
-	"github.com/PTSS-Support/identity-service/infrastructure/util"
 )
-
-// MockIdentityRepository is a mock implementation of IdentityRepository
-type MockIdentityRepository struct {
-	mock.Mock
-}
-
-func (m *MockIdentityRepository) CreateIdentity(ctx context.Context, identity *entities.KeycloakIdentity) (*entities.KeycloakIdentity, error) {
-	args := m.Called(ctx, identity)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*entities.KeycloakIdentity), args.Error(1)
-}
-
-func (m *MockIdentityRepository) GetIdentity(ctx context.Context, id string) (*entities.KeycloakIdentity, error) {
-	args := m.Called(ctx, id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*entities.KeycloakIdentity), args.Error(1)
-}
-
-func (m *MockIdentityRepository) UpdateIdentity(ctx context.Context, identity *entities.KeycloakIdentity) (*entities.KeycloakIdentity, error) {
-	args := m.Called(ctx, identity)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*entities.KeycloakIdentity), args.Error(1)
-}
-
-func (m *MockIdentityRepository) DeleteIdentity(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
-}
-
-func (m *MockIdentityRepository) VerifyPassword(ctx context.Context, username string, password string) error {
-	args := m.Called(ctx, username, password)
-	return args.Error(0)
-}
-
-func (m *MockIdentityRepository) UpdatePassword(ctx context.Context, id string, newPassword string) error {
-	args := m.Called(ctx, id, newPassword)
-	return args.Error(0)
-}
-
-func (m *MockIdentityRepository) GetIdentityByEmail(ctx context.Context, email string) (*entities.KeycloakIdentity, error) {
-	args := m.Called(ctx, email)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*entities.KeycloakIdentity), args.Error(1)
-}
-
-type MockLogger struct {
-	mock.Mock
-}
-
-func (m *MockLogger) Debug(msg string, args ...interface{}) {}
-func (m *MockLogger) Info(msg string, args ...interface{})  {}
-func (m *MockLogger) Warn(msg string, args ...interface{})  {}
-func (m *MockLogger) Error(msg string, args ...interface{}) {}
-func (m *MockLogger) WithContext(ctx context.Context) util.Logger {
-	return m
-}
-
-// MockLoggerFactory is a mock implementation of LoggerFactory
-type MockLoggerFactory struct{}
-
-func (m *MockLoggerFactory) NewLogger(name string) util.Logger {
-	return &MockLogger{}
-}
 
 func TestCreateIdentity(t *testing.T) {
 	tests := []struct {
 		name           string
 		request        *requests.CreateIdentityRequest
 		hashedPassword string
-		mockSetup      func(*MockIdentityRepository)
+		mockSetup      func(*mocks.MockIdentityRepository)
 		expectedError  error
 		expectedID     string
 	}{
@@ -105,7 +34,7 @@ func TestCreateIdentity(t *testing.T) {
 				LastName:  "User",
 			},
 			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				repo.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
 					return identity.Email == "admin@test.com"
 				})).Return(&entities.KeycloakIdentity{
@@ -127,7 +56,7 @@ func TestCreateIdentity(t *testing.T) {
 				LastName:  "Smith",
 			},
 			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				repo.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
 					return identity.Email == "doctor@hospital.com"
 				})).Return(&entities.KeycloakIdentity{
@@ -149,7 +78,7 @@ func TestCreateIdentity(t *testing.T) {
 				LastName:  "User",
 			},
 			hashedPassword: "hashedpass123",
-			mockSetup:      func(repo *MockIdentityRepository) {},
+			mockSetup:      func(repo *mocks.MockIdentityRepository) {},
 			expectedError:  errors.ErrGroupIDRequired,
 		},
 		{
@@ -161,7 +90,7 @@ func TestCreateIdentity(t *testing.T) {
 				LastName:  "Test",
 			},
 			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				repo.On("CreateIdentity", mock.Anything, mock.Anything).
 					Return(nil, errors.ErrKeycloakUnexpected)
 			},
@@ -172,10 +101,10 @@ func TestCreateIdentity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
-			mockRepo := new(MockIdentityRepository)
+			mockRepo := new(mocks.MockIdentityRepository)
 			tt.mockSetup(mockRepo)
 
-			service := services.NewIdentityService(mockRepo, &MockLoggerFactory{})
+			service := services.NewIdentityService(mockRepo, &mocks.MockLoggerFactory{})
 
 			// Execute
 			response, err := service.CreateIdentity(context.Background(), tt.request, tt.hashedPassword)
@@ -208,7 +137,7 @@ func TestCreateIdentity_ValidationCases(t *testing.T) {
 		name           string
 		request        *requests.CreateIdentityRequest
 		hashedPassword string
-		mockSetup      func(*MockIdentityRepository)
+		mockSetup      func(*mocks.MockIdentityRepository)
 		expectedError  *errors.AppError
 	}{
 		{
@@ -220,7 +149,7 @@ func TestCreateIdentity_ValidationCases(t *testing.T) {
 				LastName:  "User",
 			},
 			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				repo.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
 					return identity.Email == ""
 				})).Return(nil, errors.ErrInvalidEmail)
@@ -237,7 +166,7 @@ func TestCreateIdentity_ValidationCases(t *testing.T) {
 				GroupID:   "",
 			},
 			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				// No need to set up mock expectation as it should fail before repository call
 			},
 			expectedError: errors.ErrGroupIDRequired,
@@ -246,11 +175,11 @@ func TestCreateIdentity_ValidationCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(MockIdentityRepository)
+			mockRepo := new(mocks.MockIdentityRepository)
 			if tt.mockSetup != nil {
 				tt.mockSetup(mockRepo)
 			}
-			service := services.NewIdentityService(mockRepo, &MockLoggerFactory{})
+			service := services.NewIdentityService(mockRepo, &mocks.MockLoggerFactory{})
 
 			response, err := service.CreateIdentity(context.Background(), tt.request, tt.hashedPassword)
 
@@ -269,7 +198,7 @@ func TestUpdateRole(t *testing.T) {
 		name          string
 		id            string
 		request       *requests.UpdateRoleRequest
-		mockSetup     func(*MockIdentityRepository)
+		mockSetup     func(*mocks.MockIdentityRepository)
 		expectedError error
 		expectedRole  enums.Role
 	}{
@@ -279,7 +208,7 @@ func TestUpdateRole(t *testing.T) {
 			request: &requests.UpdateRoleRequest{
 				Role: enums.RoleAdmin,
 			},
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				// Mock getting current identity
 				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
 					ID:    "user123",
@@ -310,7 +239,7 @@ func TestUpdateRole(t *testing.T) {
 			request: &requests.UpdateRoleRequest{
 				Role: enums.Role("Patient"),
 			},
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
 					ID:    "user123",
 					Email: "test@example.com",
@@ -325,10 +254,10 @@ func TestUpdateRole(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(MockIdentityRepository)
+			mockRepo := new(mocks.MockIdentityRepository)
 			tt.mockSetup(mockRepo)
 
-			service := services.NewIdentityService(mockRepo, &MockLoggerFactory{})
+			service := services.NewIdentityService(mockRepo, &mocks.MockLoggerFactory{})
 
 			response, err := service.UpdateRole(context.Background(), tt.id, tt.request)
 
@@ -356,14 +285,14 @@ func TestVerifyPassword(t *testing.T) {
 		name          string
 		id            string
 		password      string
-		mockSetup     func(*MockIdentityRepository)
+		mockSetup     func(*mocks.MockIdentityRepository)
 		expectedError error
 	}{
 		{
 			name:     "Successful password verification",
 			id:       "user123",
 			password: "correctPassword",
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
 					ID:    "user123",
 					Email: "test@example.com",
@@ -375,7 +304,7 @@ func TestVerifyPassword(t *testing.T) {
 			name:     "Invalid credentials",
 			id:       "user123",
 			password: "wrongPassword",
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
 					ID:    "user123",
 					Email: "test@example.com",
@@ -388,10 +317,10 @@ func TestVerifyPassword(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(MockIdentityRepository)
+			mockRepo := new(mocks.MockIdentityRepository)
 			tt.mockSetup(mockRepo)
 
-			service := services.NewIdentityService(mockRepo, &MockLoggerFactory{})
+			service := services.NewIdentityService(mockRepo, &mocks.MockLoggerFactory{})
 
 			err := service.VerifyPassword(context.Background(), tt.id, tt.password)
 
@@ -416,14 +345,14 @@ func TestSetPIN(t *testing.T) {
 		name          string
 		id            string
 		hashedPIN     string
-		mockSetup     func(*MockIdentityRepository)
+		mockSetup     func(*mocks.MockIdentityRepository)
 		expectedError error
 	}{
 		{
 			name:      "Successful PIN creation",
 			id:        "user123",
 			hashedPIN: "hashedPin123",
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				// Mock getting current identity without PIN
 				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
 					ID:         "user123",
@@ -444,7 +373,7 @@ func TestSetPIN(t *testing.T) {
 			name:      "PIN already exists",
 			id:        "user123",
 			hashedPIN: "hashedPin123",
-			mockSetup: func(repo *MockIdentityRepository) {
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
 				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
 					ID: "user123",
 					Attributes: map[string][]string{
@@ -458,10 +387,10 @@ func TestSetPIN(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(MockIdentityRepository)
+			mockRepo := new(mocks.MockIdentityRepository)
 			tt.mockSetup(mockRepo)
 
-			service := services.NewIdentityService(mockRepo, &MockLoggerFactory{})
+			service := services.NewIdentityService(mockRepo, &mocks.MockLoggerFactory{})
 
 			err := service.SetPIN(context.Background(), tt.id, tt.hashedPIN)
 

@@ -78,3 +78,8 @@ func (m *MockIdentityService) ValidatePasswordResetEligibility(ctx context.Conte
 	}
 	return args.Get(0).(*entities.KeycloakIdentity), args.Error(1)
 }
+
+func (m *MockIdentityService) ResetPassword(ctx context.Context, id string, newPassword string) error {
+	args := m.Called(ctx, id, newPassword)
+	return args.Error(0)
+}
