@@ -3,6 +3,7 @@ package controllers
 import (
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/auth"
 	"github.com/PTSS-Support/identity-service/core/facades"
+	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/util"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -34,19 +35,18 @@ func (c *AuthController) RegisterRoutes(r *gin.Engine) {
 func (c *AuthController) Login(ctx *gin.Context) {
 	var req requests.LoginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request body",
-			"details": err.Error(),
+		ctx.Error(&errors.AppError{
+			Code:          "INVALID_REQUEST",
+			Err:           err,
+			ClientMessage: "Invalid request body",
+			StatusCode:    http.StatusBadRequest,
 		})
 		return
 	}
 
 	response, err := c.authFacade.HandleLogin(ctx.Request.Context(), &req)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Authentication failed",
-			"details": err.Error(),
-		})
+		ctx.Error(err)
 		return
 	}
 

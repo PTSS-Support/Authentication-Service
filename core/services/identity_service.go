@@ -25,6 +25,8 @@ type IdentityService interface {
 	UpdatePIN(ctx context.Context, id string, hashedPIN string) error
 	SetPIN(ctx context.Context, id string, hashedPIN string) error
 	GetHashedPIN(ctx context.Context, userID string) (string, error)
+	GetIdentityByEmail(ctx context.Context, email string) (*entities.KeycloakIdentity, error)
+	ValidatePasswordResetEligibility(ctx context.Context, email string) (*entities.KeycloakIdentity, error)
 	ResetPassword(ctx context.Context, id string, newPassword string) error
 }
 
@@ -70,7 +72,7 @@ func (s *identityService) CreateIdentity(ctx context.Context, req *requests.Crea
 	createdIdentity, err := s.identityRepo.CreateIdentity(ctx, keycloakIdentity)
 	if err != nil {
 		log.Error("Failed to create identity in repository", "error", err)
-		return nil, fmt.Errorf("failed to create identity: %w", err)
+		return nil, err
 	}
 
 	log.Debug("Successfully created identity in Keycloak", "id", createdIdentity.ID)
@@ -179,7 +181,7 @@ func (s *identityService) UpdatePIN(ctx context.Context, id string, hashedPIN st
 	_, err = s.identityRepo.UpdateIdentity(ctx, identity)
 	if err != nil {
 		log.Error("Failed to update identity", "error", err)
-		return fmt.Errorf("failed to update PIN in repository: %w", err)
+		return err
 	}
 
 	return nil
@@ -224,6 +226,38 @@ func (s *identityService) GetHashedPIN(ctx context.Context, userID string) (stri
 	}
 
 	return pinValues[0], nil
+}
+
+func (s *identityService) ValidatePasswordResetEligibility(ctx context.Context, email string) (*entities.KeycloakIdentity, error) {
+	log := s.logger.WithContext(ctx)
+
+	// Get user details by email
+	identity, err := s.GetIdentityByEmail(ctx, email)
+	if err != nil {
+		log.Error("Failed to get identity by email", "error", err)
+		return nil, err
+	}
+
+	// Extract role from attributes
+	roleValues, exists := identity.Attributes["role"]
+	if !exists || len(roleValues) == 0 {
+		log.Error("User has no role", "id", identity.ID)
+		return nil, errors.ErrRoleLacksPermission
+	}
+
+	role := roleValues[0]
+
+	// Validate role
+	if role == string(enums.RoleHealthcareProfessional) || role == string(enums.RoleAdmin) {
+		log.Warn("Unauthorized role attempting password reset", "role", role)
+		return nil, errors.ErrUnauthorizedReset
+	}
+
+	return identity, nil
+}
+
+func (s *identityService) GetIdentityByEmail(ctx context.Context, email string) (*entities.KeycloakIdentity, error) {
+	return s.identityRepo.GetIdentityByEmail(ctx, email)
 }
 
 func (s *identityService) ResetPassword(ctx context.Context, id string, newPassword string) error {
