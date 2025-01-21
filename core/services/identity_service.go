@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
@@ -26,6 +27,7 @@ type IdentityService interface {
 	GetHashedPIN(ctx context.Context, userID string) (string, error)
 	GetIdentityByEmail(ctx context.Context, email string) (*entities.KeycloakIdentity, error)
 	ValidatePasswordResetEligibility(ctx context.Context, email string) (*entities.KeycloakIdentity, error)
+	ResetPassword(ctx context.Context, id string, newPassword string) error
 }
 
 type identityService struct {
@@ -256,4 +258,19 @@ func (s *identityService) ValidatePasswordResetEligibility(ctx context.Context, 
 
 func (s *identityService) GetIdentityByEmail(ctx context.Context, email string) (*entities.KeycloakIdentity, error) {
 	return s.identityRepo.GetIdentityByEmail(ctx, email)
+}
+
+func (s *identityService) ResetPassword(ctx context.Context, id string, newPassword string) error {
+	log := s.logger.WithContext(ctx)
+	log.Info("Starting password reset process", "id", id)
+
+	// Optional: Add password complexity checks if needed
+	err := s.identityRepo.ResetPassword(ctx, id, newPassword)
+	if err != nil {
+		log.Error("Failed to reset password", "error", err, "id", id)
+		return fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	log.Info("Successfully reset password", "id", id)
+	return nil
 }
