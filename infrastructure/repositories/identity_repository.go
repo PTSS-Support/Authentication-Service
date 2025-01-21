@@ -260,7 +260,7 @@ func (r *identityRepository) createKeycloakUser(ctx context.Context, identity *e
 
 	resp, err := r.makeJSONRequest(ctx, "POST", usersURL, identity)
 	if err != nil {
-		return "", fmt.Errorf("failed to make request: %w", err)
+		return "", err
 	}
 	defer resp.Body.Close()
 
