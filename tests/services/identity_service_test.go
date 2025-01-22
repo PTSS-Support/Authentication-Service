@@ -35,13 +35,19 @@ func TestCreateIdentity(t *testing.T) {
 			},
 			hashedPassword: "hashedpass123",
 			mockSetup: func(repo *mocks.MockIdentityRepository) {
+				// Mock the email check - return nil to indicate email doesn't exist
+				repo.On("GetIdentityByEmail", mock.Anything, "admin@test.com").Return(nil, nil)
+
+				// Mock the creation
 				repo.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
-					return identity.Email == "admin@test.com"
+					return identity.Email == "admin@test.com" &&
+						len(identity.Attributes["userId"]) > 0
 				})).Return(&entities.KeycloakIdentity{
 					ID:    "user123",
 					Email: "admin@test.com",
 					Attributes: map[string][]string{
-						"role": {string(enums.RoleAdmin)},
+						"role":   {string(enums.RoleAdmin)},
+						"userId": {"user123"},
 					},
 				}, nil)
 			},
@@ -54,20 +60,47 @@ func TestCreateIdentity(t *testing.T) {
 				Role:      enums.RoleHealthcareProfessional,
 				FirstName: "Doctor",
 				LastName:  "Smith",
+				GroupID:   "hospital123",
 			},
 			hashedPassword: "hashedpass123",
 			mockSetup: func(repo *mocks.MockIdentityRepository) {
+				// Mock the email check
+				repo.On("GetIdentityByEmail", mock.Anything, "doctor@hospital.com").Return(nil, nil)
+
+				// Mock the creation
 				repo.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
-					return identity.Email == "doctor@hospital.com"
+					return identity.Email == "doctor@hospital.com" &&
+						len(identity.Attributes["userId"]) > 0 &&
+						identity.Attributes["groupId"][0] == "hospital123"
 				})).Return(&entities.KeycloakIdentity{
 					ID:    "doctor123",
 					Email: "doctor@hospital.com",
 					Attributes: map[string][]string{
-						"role": {string(enums.RoleHealthcareProfessional)},
+						"role":    {string(enums.RoleHealthcareProfessional)},
+						"userId":  {"doctor123"},
+						"groupId": {"hospital123"},
 					},
 				}, nil)
 			},
 			expectedID: "doctor123",
+		},
+		{
+			name: "Email already exists",
+			request: &requests.CreateIdentityRequest{
+				Email:     "existing@test.com",
+				Role:      enums.RoleAdmin,
+				FirstName: "Test",
+				LastName:  "User",
+			},
+			hashedPassword: "hashedpass123",
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
+				// Mock the email check to return an existing user
+				repo.On("GetIdentityByEmail", mock.Anything, "existing@test.com").Return(&entities.KeycloakIdentity{
+					ID:    "existing123",
+					Email: "existing@test.com",
+				}, nil)
+			},
+			expectedError: errors.ErrUserAlreadyExists,
 		},
 		{
 			name: "Missing GroupID for non-admin role",
@@ -78,8 +111,10 @@ func TestCreateIdentity(t *testing.T) {
 				LastName:  "User",
 			},
 			hashedPassword: "hashedpass123",
-			mockSetup:      func(repo *mocks.MockIdentityRepository) {},
-			expectedError:  errors.ErrGroupIDRequired,
+			mockSetup: func(repo *mocks.MockIdentityRepository) {
+				// No need to set up mocks as it should fail validation before repository calls
+			},
+			expectedError: errors.ErrGroupIDRequired,
 		},
 		{
 			name: "Repository error handling",
@@ -91,6 +126,10 @@ func TestCreateIdentity(t *testing.T) {
 			},
 			hashedPassword: "hashedpass123",
 			mockSetup: func(repo *mocks.MockIdentityRepository) {
+				// Mock the email check
+				repo.On("GetIdentityByEmail", mock.Anything, "error@test.com").Return(nil, nil)
+
+				// Mock the creation to return an error
 				repo.On("CreateIdentity", mock.Anything, mock.Anything).
 					Return(nil, errors.ErrKeycloakUnexpected)
 			},
@@ -150,6 +189,8 @@ func TestCreateIdentity_ValidationCases(t *testing.T) {
 			},
 			hashedPassword: "hashedpass123",
 			mockSetup: func(repo *mocks.MockIdentityRepository) {
+				repo.On("GetIdentityByEmail", mock.Anything, "").Return(nil, errors.ErrInvalidEmail)
+
 				repo.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
 					return identity.Email == ""
 				})).Return(nil, errors.ErrInvalidEmail)
@@ -216,6 +257,7 @@ func TestUpdateRole(t *testing.T) {
 					Attributes: map[string][]string{
 						"role":    {"Patient"},
 						"groupId": {"group123"},
+						"userId":  {"user123"},
 					},
 				}, nil)
 
@@ -227,7 +269,8 @@ func TestUpdateRole(t *testing.T) {
 					ID:    "user123",
 					Email: "test@example.com",
 					Attributes: map[string][]string{
-						"role": {string(enums.RoleAdmin)},
+						"role":   {string(enums.RoleAdmin)},
+						"userId": {"user123"},
 					},
 				}, nil)
 			},
@@ -296,6 +339,9 @@ func TestVerifyPassword(t *testing.T) {
 				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
 					ID:    "user123",
 					Email: "test@example.com",
+					Attributes: map[string][]string{
+						"userId": {"user123"},
+					},
 				}, nil)
 				repo.On("VerifyPassword", mock.Anything, "test@example.com", "correctPassword").Return(nil)
 			},
