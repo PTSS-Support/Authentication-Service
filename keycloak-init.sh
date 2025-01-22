@@ -466,7 +466,7 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
     done
 
     # Create custom roles for application specific roles
-    CUSTOM_ROLES="admin family_member primary_relative patient healthcare_professional"
+    CUSTOM_ROLES="ADMIN FAMILY_MEMBER PRIMARY_RELATIVE PATIENT HEALTHCARE_PROFESSIONAL"
 
     for ROLE in $CUSTOM_ROLES; do
         ROLE_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \

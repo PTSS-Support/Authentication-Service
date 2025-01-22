@@ -5,5 +5,5 @@ import (
 )
 
 type UpdateRoleRequest struct {
-	Role enums.Role `json:"role" binding:"required,oneof=admin family_member primary_relative patient healthcare_professional"`
+	Role enums.Role `json:"role" binding:"required,oneof=ADMIN FAMILY_MEMBER PRIMARY_RELATIVE PATIENT HEALTHCARE_PROFESSIONAL"`
 }
