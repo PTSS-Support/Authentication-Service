@@ -63,7 +63,7 @@ func (s *identityService) CreateIdentity(ctx context.Context, req *requests.Crea
 
 	// Create domain model
 	identity := &models.Identity{
-		User_ID:   req.UserId,
+		UserID:    req.UserId,
 		Email:     req.Email,
 		Role:      req.Role,
 		GroupID:   req.GroupID,

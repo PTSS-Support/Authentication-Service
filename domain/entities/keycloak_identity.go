@@ -39,7 +39,7 @@ func (ki *KeycloakIdentity) ToModel() *models.Identity {
 
 	return &models.Identity{
 		ID:        ki.ID,
-		User_ID:   ki.Attributes["userId"][0],
+		UserID:    ki.Attributes["userId"][0],
 		Email:     ki.Email,
 		PIN:       pin,
 		Role:      role,
@@ -52,7 +52,7 @@ func (ki *KeycloakIdentity) ToModel() *models.Identity {
 // FromModel creates a KeycloakIdentity from a domain Identity model
 func FromModel(model *models.Identity, hashedPassword string) *KeycloakIdentity {
 	attributes := map[string][]string{
-		"userId":  {model.User_ID},
+		"userId":  {model.UserID},
 		"role":    {string(model.Role)},
 		"hasPin":  {strconv.FormatBool(model.PIN != nil)},
 		"groupId": {model.GroupID},
