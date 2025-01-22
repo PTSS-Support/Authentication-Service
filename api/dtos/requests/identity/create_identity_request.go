@@ -5,6 +5,7 @@ import (
 )
 
 type CreateIdentityRequest struct {
+	UserId    string     `json:"userId" binding:"required,uuid"`
 	Email     string     `json:"email" binding:"required,email,min=6,max=254"`
 	Password  string     `json:"password" binding:"required,min=8,max=128"`
 	Role      enums.Role `json:"role" binding:"required,oneof=admin family_member primary_relative patient healthcare_professional"`
