@@ -1,457 +1,620 @@
-package services_test
+#!/bin/sh
+set -e
 
-import (
-	"context"
-	"github.com/PTSS-Support/identity-service/tests/mocks"
-	"testing"
+USE_DOCKER=${USE_DOCKER:-true}
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+# Load environment variables
+if [ -f .env ]; then
+    export $(cat .env | grep -v '^#' | xargs)
+else
+    echo "Error: .env file not found"
+    exit 1
+fi
 
-	requests "github.com/PTSS-Support/identity-service/api/dtos/requests/identity"
-	"github.com/PTSS-Support/identity-service/core/services"
-	"github.com/PTSS-Support/identity-service/domain/entities"
-	"github.com/PTSS-Support/identity-service/domain/enums"
-	"github.com/PTSS-Support/identity-service/domain/errors"
-)
-
-func TestCreateIdentity(t *testing.T) {
-	tests := []struct {
-		name           string
-		request        *requests.CreateIdentityRequest
-		hashedPassword string
-		mockSetup      func(*mocks.MockIdentityRepository)
-		expectedError  error
-		expectedID     string
-	}{
-		{
-			name: "Successful identity creation for admin role",
-			request: &requests.CreateIdentityRequest{
-				Email:     "admin@test.com",
-				Role:      enums.RoleAdmin,
-				FirstName: "Admin",
-				LastName:  "User",
-			},
-			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				// Mock the email check - return nil to indicate email doesn't exist
-				repo.On("GetIdentityByEmail", mock.Anything, "admin@test.com").Return(nil, nil)
-
-				// Mock the creation
-				repo.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
-					return identity.Email == "admin@test.com" &&
-						len(identity.Attributes["userId"]) > 0
-				})).Return(&entities.KeycloakIdentity{
-					ID:    "user123",
-					Email: "admin@test.com",
-					Attributes: map[string][]string{
-						"role":   {string(enums.RoleAdmin)},
-						"userId": {"user123"},
-					},
-				}, nil)
-			},
-			expectedID: "user123",
-		},
-		{
-			name: "Successful identity creation for healthcare professional",
-			request: &requests.CreateIdentityRequest{
-				Email:     "doctor@hospital.com",
-				Role:      enums.RoleHealthcareProfessional,
-				FirstName: "Doctor",
-				LastName:  "Smith",
-				GroupID:   "hospital123",
-			},
-			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				// Mock the email check
-				repo.On("GetIdentityByEmail", mock.Anything, "doctor@hospital.com").Return(nil, nil)
-
-				// Mock the creation
-				repo.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
-					return identity.Email == "doctor@hospital.com" &&
-						len(identity.Attributes["userId"]) > 0 &&
-						identity.Attributes["groupId"][0] == "hospital123"
-				})).Return(&entities.KeycloakIdentity{
-					ID:    "doctor123",
-					Email: "doctor@hospital.com",
-					Attributes: map[string][]string{
-						"role":    {string(enums.RoleHealthcareProfessional)},
-						"userId":  {"doctor123"},
-						"groupId": {"hospital123"},
-					},
-				}, nil)
-			},
-			expectedID: "doctor123",
-		},
-		{
-			name: "Email already exists",
-			request: &requests.CreateIdentityRequest{
-				Email:     "existing@test.com",
-				Role:      enums.RoleAdmin,
-				FirstName: "Test",
-				LastName:  "User",
-			},
-			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				// Mock the email check to return an existing user
-				repo.On("GetIdentityByEmail", mock.Anything, "existing@test.com").Return(&entities.KeycloakIdentity{
-					ID:    "existing123",
-					Email: "existing@test.com",
-				}, nil)
-			},
-			expectedError: errors.ErrUserAlreadyExists,
-		},
-		{
-			name: "Missing GroupID for non-admin role",
-			request: &requests.CreateIdentityRequest{
-				Email:     "user@test.com",
-				Role:      enums.Role("Patient"),
-				FirstName: "Test",
-				LastName:  "User",
-			},
-			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				// No need to set up mocks as it should fail validation before repository calls
-			},
-			expectedError: errors.ErrGroupIDRequired,
-		},
-		{
-			name: "Repository error handling",
-			request: &requests.CreateIdentityRequest{
-				Email:     "error@test.com",
-				Role:      enums.RoleAdmin,
-				FirstName: "Error",
-				LastName:  "Test",
-			},
-			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				// Mock the email check
-				repo.On("GetIdentityByEmail", mock.Anything, "error@test.com").Return(nil, nil)
-
-				// Mock the creation to return an error
-				repo.On("CreateIdentity", mock.Anything, mock.Anything).
-					Return(nil, errors.ErrKeycloakUnexpected)
-			},
-			expectedError: errors.ErrKeycloakUnexpected,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Setup
-			mockRepo := new(mocks.MockIdentityRepository)
-			tt.mockSetup(mockRepo)
-
-			service := services.NewIdentityService(mockRepo, &mocks.MockLoggerFactory{})
-
-			// Execute
-			response, err := service.CreateIdentity(context.Background(), tt.request, tt.hashedPassword)
-
-			// Assert
-			if tt.expectedError != nil {
-				assert.Error(t, err)
-				if appErr, ok := err.(*errors.AppError); ok {
-					expectedAppErr, ok := tt.expectedError.(*errors.AppError)
-					require.True(t, ok, "expected error should be an AppError")
-					assert.Equal(t, expectedAppErr.Code, appErr.Code)
-				}
-				assert.Nil(t, response)
-			} else {
-				require.NoError(t, err)
-				require.NotNil(t, response)
-				assert.Equal(t, tt.expectedID, response.ID)
-				assert.Equal(t, tt.request.Email, response.Email)
-				assert.Equal(t, tt.request.Role, response.Role)
-			}
-
-			// Verify all expectations were met
-			mockRepo.AssertExpectations(t)
-		})
-	}
+# Required environment variables check
+check_required_var() {
+    if [ -z "$(eval echo \$$1)" ]; then
+        echo "Error: Required environment variable $1 is not set"
+        exit 1
+    fi
 }
 
-func TestCreateIdentity_ValidationCases(t *testing.T) {
-	tests := []struct {
-		name           string
-		request        *requests.CreateIdentityRequest
-		hashedPassword string
-		mockSetup      func(*mocks.MockIdentityRepository)
-		expectedError  *errors.AppError
-	}{
-		{
-			name: "Empty email",
-			request: &requests.CreateIdentityRequest{
-				Email:     "",
-				Role:      enums.RoleAdmin,
-				FirstName: "Test",
-				LastName:  "User",
-			},
-			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				repo.On("GetIdentityByEmail", mock.Anything, "").Return(nil, errors.ErrInvalidEmail)
+# Check all required variables
+check_required_var "KEYCLOAK_BASE_URL"
+check_required_var "KEYCLOAK_ADMIN_CLIENT_ID"
+check_required_var "KEYCLOAK_ADMIN_USERNAME"
+check_required_var "KEYCLOAK_ADMIN_PASSWORD"
+check_required_var "KEYCLOAK_REALM"
+check_required_var "KEYCLOAK_CLIENT_ID"
+check_required_var "KEYCLOAK_REALM_ADMIN_USERNAME"
+check_required_var "KEYCLOAK_REALM_ADMIN_PASSWORD"
 
-				repo.On("CreateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
-					return identity.Email == ""
-				})).Return(nil, errors.ErrInvalidEmail)
-			},
-			expectedError: errors.ErrInvalidEmail,
-		},
-		{
-			name: "Missing required GroupID for patient role",
-			request: &requests.CreateIdentityRequest{
-				Email:     "patient@test.com",
-				Role:      "Patient",
-				FirstName: "Test",
-				LastName:  "User",
-				GroupID:   "",
-			},
-			hashedPassword: "hashedpass123",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				// No need to set up mock expectation as it should fail before repository call
-			},
-			expectedError: errors.ErrGroupIDRequired,
-		},
-	}
+if [ "$USE_DOCKER" = "true" ]; then
+    KEYCLOAK_BASE_URL="http://keycloak:8080"
+    echo "Running in Docker mode, using URL: ${KEYCLOAK_BASE_URL}"
+fi
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(mocks.MockIdentityRepository)
-			if tt.mockSetup != nil {
-				tt.mockSetup(mockRepo)
-			}
-			service := services.NewIdentityService(mockRepo, &mocks.MockLoggerFactory{})
+# Wait for Keycloak to be ready
+until curl -f "${KEYCLOAK_BASE_URL}/health/ready"; do
+    echo "Trying to connect to Keycloak at: ${KEYCLOAK_BASE_URL}/health/ready"
+    echo "Waiting for Keycloak to start..."
+    sleep 5
+done
 
-			response, err := service.CreateIdentity(context.Background(), tt.request, tt.hashedPassword)
+# Login to get admin token
+echo "Logging in as admin..."
+TOKEN=$(curl -d "client_id=${KEYCLOAK_ADMIN_CLIENT_ID}" \
+    -d "username=${KEYCLOAK_ADMIN_USERNAME}" \
+    -d "password=${KEYCLOAK_ADMIN_PASSWORD}" \
+    -d "grant_type=password" \
+    "${KEYCLOAK_BASE_URL}/realms/master/protocol/openid-connect/token" | jq -r '.access_token')
 
-			assert.Error(t, err)
-			if appErr, ok := err.(*errors.AppError); ok {
-				assert.Equal(t, tt.expectedError.Code, appErr.Code)
-			}
-			assert.Nil(t, response)
-			mockRepo.AssertExpectations(t)
-		})
-	}
-}
+if [ -z "$TOKEN" ]; then
+    echo "Error: Failed to obtain admin token"
+    exit 1
+fi
 
-func TestUpdateRole(t *testing.T) {
-	tests := []struct {
-		name          string
-		id            string
-		request       *requests.UpdateRoleRequest
-		mockSetup     func(*mocks.MockIdentityRepository)
-		expectedError error
-		expectedRole  enums.Role
-	}{
-		{
-			name: "Successful role update to admin",
-			id:   "user123",
-			request: &requests.UpdateRoleRequest{
-				Role: enums.RoleAdmin,
-			},
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				// Mock getting current identity
-				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
-					ID:    "user123",
-					Email: "test@example.com",
-					Attributes: map[string][]string{
-						"role":    {"Patient"},
-						"groupId": {"group123"},
-						"userId":  {"user123"},
-					},
-				}, nil)
+# Check if realm exists
+REALM_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}")
 
-				// Mock updating identity
-				repo.On("UpdateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
-					roleAttr, exists := identity.Attributes["role"]
-					return exists && len(roleAttr) > 0 && roleAttr[0] == string(enums.RoleAdmin)
-				})).Return(&entities.KeycloakIdentity{
-					ID:    "user123",
-					Email: "test@example.com",
-					Attributes: map[string][]string{
-						"role":   {string(enums.RoleAdmin)},
-						"userId": {"user123"},
-					},
-				}, nil)
-			},
-			expectedRole: enums.RoleAdmin,
-		},
-		{
-			name: "Missing GroupID for non-admin role",
-			id:   "user123",
-			request: &requests.UpdateRoleRequest{
-				Role: enums.Role("Patient"),
-			},
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
-					ID:    "user123",
-					Email: "test@example.com",
-					Attributes: map[string][]string{
-						"role": {"Admin"},
-					},
-				}, nil)
-			},
-			expectedError: errors.ErrGroupIDRequired,
-		},
-	}
+if [ "$REALM_EXISTS" = "404" ]; then
+    echo "Creating realm..."
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+              "realm":"'"${KEYCLOAK_REALM}"'",
+              "revokeRefreshToken":true,
+              "enabled":true,
+              "accessTokenLifespan":1200,
+              "ssoSessionIdleTimeout":2592000,
+              "ssoSessionMaxLifespan":2592000,
+              "offlineSessionIdleTimeout":2592000,
+              "offlineSessionMaxLifespan":2592000,
+              "refreshTokenMaxReuse":0,
+              "accessTokenLifespanForImplicitFlow":1200
+                }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms"
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(mocks.MockIdentityRepository)
-			tt.mockSetup(mockRepo)
+    echo "Configuring user profile attributes..."
+        # shellcheck disable=SC2016
+    curl -X PUT \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+                  "attributes": [
+                      {
+                          "name": "userId",
+                          "displayName": "User ID",
+                          "required": {
+                              "roles": ["user"]
+                          },
+                          "permissions": {
+                              "view": ["admin", "user"],
+                              "edit": ["admin"]
+                          },
+                          "multivalued": false,
+                          "validations": {
+                              "length": { "min": 1, "max": 255 }
+                          }
+                      },
+                      {
+                          "name": "username",
+                          "displayName": "${username}",
+                          "validations": {
+                              "length": {
+                                  "min": 3,
+                                  "max": 255
+                              },
+                              "username-prohibited-characters": {},
+                              "up-username-not-idn-homograph": {}
+                          },
+                          "permissions": {
+                              "view": ["admin"],
+                              "edit": ["admin", "user"]
+                          },
+                          "multivalued": false
+                      },
+                      {
+                          "name": "email",
+                          "displayName": "${email}",
+                          "validations": {
+                              "email": {},
+                              "length": {
+                                  "max": 255
+                              }
+                          },
+                          "required": {
+                              "roles": ["user"]
+                          },
+                          "permissions": {
+                              "view": ["admin"],
+                              "edit": ["admin", "user"]
+                          },
+                          "multivalued": false
+                      },
+                      {
+                          "name": "firstName",
+                          "displayName": "${firstName}",
+                          "validations": {
+                              "length": {
+                                  "max": 255
+                              },
+                              "person-name-prohibited-characters": {}
+                          },
+                          "required": {
+                              "roles": ["user"]
+                          },
+                          "permissions": {
+                              "view": ["admin", "user"],
+                              "edit": ["admin", "user"]
+                          },
+                          "multivalued": false
+                      },
+                      {
+                          "name": "lastName",
+                          "displayName": "${lastName}",
+                          "validations": {
+                              "length": {
+                                  "max": 255
+                              },
+                              "person-name-prohibited-characters": {}
+                          },
+                          "required": {
+                              "roles": ["user"]
+                          },
+                          "permissions": {
+                              "view": ["admin", "user"],
+                              "edit": ["admin", "user"]
+                          },
+                          "multivalued": false
+                      },
+                      {
+                          "name": "groupId",
+                          "displayName": "group id",
+                          "permissions": {
+                              "edit": ["admin", "user"],
+                              "view": ["user", "admin"]
+                          },
+                          "multivalued": false,
+                          "annotations": {},
+                          "validations": {}
+                      },
+                      {
+                          "name": "role",
+                          "displayName": "Role",
+                          "permissions": {
+                              "edit": ["admin"],
+                              "view": ["user", "admin"]
+                          },
+                          "multivalued": false,
+                          "annotations": {},
+                          "validations": {
+                              "length": { "min": 1, "max": 255 }
+                          }
+                      },
+                      {
+                          "name": "hasPin",
+                          "displayName": "Has PIN",
+                          "permissions": {
+                              "edit": ["admin", "user"],
+                              "view": ["user", "admin"]
+                          },
+                          "multivalued": false,
+                          "annotations": {},
+                          "validations": {}
+                      },
+                      {
+                          "name": "pin",
+                          "displayName": "PIN",
+                          "permissions": {
+                              "edit": ["admin", "user"],
+                              "view": ["user", "admin"]
+                          },
+                          "multivalued": false,
+                          "annotations": {},
+                          "validations": {
+                              "length": { "min": 1, "max": 255 }
+                          }
+                      }
+                  ],
+                  "groups": [
+                      {
+                          "name": "user-metadata",
+                          "displayHeader": "User metadata",
+                          "displayDescription": "Attributes, which refer to user metadata"
+                      }
+                  ]
+              }'  \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/users/profile"
+else
+    echo "Realm already exists, skipping creation..."
+fi
 
-			service := services.NewIdentityService(mockRepo, &mocks.MockLoggerFactory{})
+# Check if client exists
+CLIENT_EXISTS=$(curl -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${KEYCLOAK_CLIENT_ID}" | jq '. | length')
 
-			response, err := service.UpdateRole(context.Background(), tt.id, tt.request)
+if [ "$CLIENT_EXISTS" = "0" ]; then
+    echo "Creating client..."
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "clientId": "'"${KEYCLOAK_CLIENT_ID}"'",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "serviceAccountsEnabled": true,
+            "authorizationServicesEnabled": true,
+            "directAccessGrantsEnabled": true,
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "publicClient": false,
+            "redirectUris": ["*"],
+            "webOrigins": ["*"],
+            "clientAuthenticatorType": "client-secret"
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients"
 
-			if tt.expectedError != nil {
-				assert.Error(t, err)
-				assert.Nil(t, response)
-				if appErr, ok := err.(*errors.AppError); ok {
-					expectedAppErr, ok := tt.expectedError.(*errors.AppError)
-					require.True(t, ok)
-					assert.Equal(t, expectedAppErr.Code, appErr.Code)
-				}
-			} else {
-				require.NoError(t, err)
-				require.NotNil(t, response)
-				assert.Equal(t, tt.expectedRole, response.Role)
-			}
+    echo "Client created!"
 
-			mockRepo.AssertExpectations(t)
-		})
-	}
-}
+    CLIENT_UUID=$(curl -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${KEYCLOAK_CLIENT_ID}" | jq -r '.[0].id')
 
-func TestVerifyPassword(t *testing.T) {
-	tests := []struct {
-		name          string
-		id            string
-		password      string
-		mockSetup     func(*mocks.MockIdentityRepository)
-		expectedError error
-	}{
-		{
-			name:     "Successful password verification",
-			id:       "user123",
-			password: "correctPassword",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
-					ID:    "user123",
-					Email: "test@example.com",
-					Attributes: map[string][]string{
-						"userId": {"user123"},
-					},
-				}, nil)
-				repo.On("VerifyPassword", mock.Anything, "test@example.com", "correctPassword").Return(nil)
-			},
-		},
-		{
-			name:     "Invalid credentials",
-			id:       "user123",
-			password: "wrongPassword",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
-					ID:    "user123",
-					Email: "test@example.com",
-				}, nil)
-				repo.On("VerifyPassword", mock.Anything, "test@example.com", "wrongPassword").Return(errors.ErrInvalidCredentials)
-			},
-			expectedError: errors.ErrInvalidCredentials,
-		},
-	}
+    # Create user-details client scope
+    echo "Creating client scope..."
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "user-details",
+            "protocol": "openid-connect",
+            "attributes": {
+                "include.in.token.scope": "true",
+                "display.on.consent.screen": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes"
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(mocks.MockIdentityRepository)
-			tt.mockSetup(mockRepo)
+    # Get the scope ID
+    SCOPE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes" \
+        | jq -r '.[] | select(.name=="user-details") | .id')
 
-			service := services.NewIdentityService(mockRepo, &mocks.MockLoggerFactory{})
+    # Add user ID mapper
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "user-id-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "config": {
+                "user.attribute": "userId",
+                "claim.name": "userId",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
 
-			err := service.VerifyPassword(context.Background(), tt.id, tt.password)
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "realm-roles",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-realm-role-mapper",
+            "config": {
+                "multivalued": "true",
+                "claim.name": "roles",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
 
-			if tt.expectedError != nil {
-				assert.Error(t, err)
-				if appErr, ok := err.(*errors.AppError); ok {
-					expectedAppErr, ok := tt.expectedError.(*errors.AppError)
-					require.True(t, ok)
-					assert.Equal(t, expectedAppErr.Code, appErr.Code)
-				}
-			} else {
-				assert.NoError(t, err)
-			}
+    # Add role mapper
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "role-attribute-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "config": {
+                "user.attribute": "role",
+                "claim.name": "role",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
 
-			mockRepo.AssertExpectations(t)
-		})
-	}
-}
+    # Add hasPin mapper
+    curl -k -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "has-pin-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "config": {
+                "user.attribute": "hasPin",
+                "claim.name": "has_pin",
+                "jsonType.label": "boolean",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "access.tokenResponse.claim": "false",
+                "refresh.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
 
-func TestSetPIN(t *testing.T) {
-	tests := []struct {
-		name          string
-		id            string
-		hashedPIN     string
-		mockSetup     func(*mocks.MockIdentityRepository)
-		expectedError error
-	}{
-		{
-			name:      "Successful PIN creation",
-			id:        "user123",
-			hashedPIN: "hashedPin123",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				// Mock getting current identity without PIN
-				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
-					ID:         "user123",
-					Email:      "test@example.com",
-					Attributes: map[string][]string{},
-				}, nil)
+    # Add firstName mapper
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "first-name",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-property-mapper",
+            "config": {
+                "user.attribute": "firstName",
+                "claim.name": "first_name",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
 
-				// Mock updating identity with PIN
-				repo.On("UpdateIdentity", mock.Anything, mock.MatchedBy(func(identity *entities.KeycloakIdentity) bool {
-					pinAttr, exists := identity.Attributes["pin"]
-					hasPinAttr, hasHasPin := identity.Attributes["hasPin"]
-					return exists && len(pinAttr) > 0 && pinAttr[0] == "hashedPin123" &&
-						hasHasPin && len(hasPinAttr) > 0 && hasPinAttr[0] == "true"
-				})).Return(&entities.KeycloakIdentity{}, nil)
-			},
-		},
-		{
-			name:      "PIN already exists",
-			id:        "user123",
-			hashedPIN: "hashedPin123",
-			mockSetup: func(repo *mocks.MockIdentityRepository) {
-				repo.On("GetIdentity", mock.Anything, "user123").Return(&entities.KeycloakIdentity{
-					ID: "user123",
-					Attributes: map[string][]string{
-						"pin": {"existingHashedPin"},
-					},
-				}, nil)
-			},
-			expectedError: errors.ErrPINAlreadyExists,
-		},
-	}
+    # Add lastName mapper
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "last-name",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-property-mapper",
+            "config": {
+                "user.attribute": "lastName",
+                "claim.name": "last_name",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(mocks.MockIdentityRepository)
-			tt.mockSetup(mockRepo)
+    # Add groupId mapper
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "group-id",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "config": {
+                "user.attribute": "groupId",
+                "claim.name": "group_id",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+            }
+        }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
 
-			service := services.NewIdentityService(mockRepo, &mocks.MockLoggerFactory{})
+    # Assign scope to client
+    curl -X PUT \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/default-client-scopes/${SCOPE_ID}"
 
-			err := service.SetPIN(context.Background(), tt.id, tt.hashedPIN)
+    echo "Client scope created and assigned to client!"
+fi
 
-			if tt.expectedError != nil {
-				assert.Error(t, err)
-				if appErr, ok := err.(*errors.AppError); ok {
-					expectedAppErr, ok := tt.expectedError.(*errors.AppError)
-					require.True(t, ok)
-					assert.Equal(t, expectedAppErr.Code, appErr.Code)
-				}
-			} else {
-				assert.NoError(t, err)
-			}
+# Get client UUID (whether newly created or existing)
+echo "Getting client UUID..."
+CLIENT_UUID=$(curl -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${KEYCLOAK_CLIENT_ID}" | jq -r '.[0].id')
 
-			mockRepo.AssertExpectations(t)
-		})
-	}
-}
+
+# Finally assign scope to client
+curl -X PUT \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/default-client-scopes/${SCOPE_ID}"
+
+if [ "$CLIENT_EXISTS" = "0" ]; then
+    echo "Getting client secret..."
+    CLIENT_SECRET=$(curl -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/$CLIENT_UUID/client-secret" | jq -r '.value')
+
+    # Create required realm roles if they don't exist
+    echo "Creating realm roles..."
+    ROLES="manage-users view-users create-user validate-tokens manage-realm view-realm manage-clients view-clients manage-authorization token-exchange impersonation"
+
+    for ROLE in $ROLES; do
+        ROLE_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/roles/${ROLE}")
+
+        if [ "$ROLE_EXISTS" = "404" ]; then
+            curl -X POST \
+                -H "Authorization: Bearer $TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{
+                    "name": "'"${ROLE}"'",
+                    "description": "Permission to '"${ROLE}"'"
+                }' \
+                "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/roles"
+            echo "Created role: ${ROLE}"
+        fi
+    done
+
+    # Create custom roles for application specific roles
+    CUSTOM_ROLES="admin family_member primary_relative patient healthcare_professional"
+
+    for ROLE in $CUSTOM_ROLES; do
+        ROLE_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/roles/${ROLE}")
+
+        if [ "$ROLE_EXISTS" = "404" ]; then
+            curl -X POST \
+                -H "Authorization: Bearer $TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{
+                    "name": "'"${ROLE}"'",
+                    "description": "'"${ROLE}"' role"
+                }' \
+                "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/roles"
+            echo "Created role: ${ROLE}"
+        fi
+    done
+
+    # Update .env file with client secret
+    if [ -n "$CLIENT_SECRET" ]; then
+        if ! grep -q "KEYCLOAK_CLIENT_SECRET=" .env; then
+            echo "KEYCLOAK_CLIENT_SECRET=$CLIENT_SECRET" >> .env
+            echo "Client secret added to .env file"
+        fi
+    else
+        echo "Error: Failed to obtain client secret"
+        exit 1
+    fi
+fi
+
+# Check if admin user exists
+USER_EXISTS=$(curl -s -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/users?username=${KEYCLOAK_REALM_ADMIN_USERNAME}" | jq '. | length')
+
+if [ "$USER_EXISTS" = "0" ]; then
+    echo "Creating admin user..."
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+              "username": "'"${KEYCLOAK_REALM_ADMIN_USERNAME}"'",
+              "enabled": true,
+              "emailVerified": true,
+              "email": "realm_admin@example.com",
+              "firstName": "Realm",
+              "lastName": "Admin",
+              "credentials": [{
+                  "type": "password",
+                  "value": "'"${KEYCLOAK_REALM_ADMIN_PASSWORD}"'",
+                  "temporary": false
+              }],
+              "requiredActions": [],
+              "realmRoles": ["admin manage-users view-users create-user validate-tokens"]
+          }' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/users"
+    # Get the user ID
+    USER_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/users?username=${KEYCLOAK_REALM_ADMIN_USERNAME}" \
+        | jq -r '.[0].id')
+
+    # Assign realm roles to the user
+    echo "Assigning roles to admin user..."
+    for ROLE in $ROLES; do
+        ROLE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+            "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/roles/${ROLE}" \
+            | jq -r '.id')
+
+        curl -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '[{
+                "id": "'"${ROLE_ID}"'",
+                "name": "'"${ROLE}"'"
+            }]' \
+            "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/users/${USER_ID}/role-mappings/realm"
+    done
+
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '[{
+            "id": "admin",
+            "name": "admin"
+        }]' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/users/${USER_ID}/role-mappings/realm"
+else
+    echo "Admin user already exists, skipping creation..."
+fi
+
+
+# removing the default scopes
+# email scope
+EMAIL_SCOPE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes" \
+    | jq -r '.[] | select(.name=="email") | .id')
+
+if [ -n "$EMAIL_SCOPE_ID" ]; then
+    echo "Removing email scope from client..."
+    curl -X DELETE \
+        -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/default-client-scopes/${EMAIL_SCOPE_ID}"
+fi
+
+# Remove profile scope (contains preferred_username)
+PROFILE_SCOPE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes" \
+    | jq -r '.[] | select(.name=="profile") | .id')
+
+if [ -n "$PROFILE_SCOPE_ID" ]; then
+    echo "Removing profile scope from client..."
+    curl -X DELETE \
+        -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/default-client-scopes/${PROFILE_SCOPE_ID}"
+fi
+
+# Remove roles scope (contains realm_access)
+ROLES_SCOPE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes" \
+    | jq -r '.[] | select(.name=="roles") | .id')
+
+if [ -n "$ROLES_SCOPE_ID" ]; then
+    echo "Removing roles scope from client..."
+    curl -X DELETE \
+        -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/default-client-scopes/${ROLES_SCOPE_ID}"
+fi
+
+# Setup service account permissions
+echo "Setting up service account permissions..."
+SERVICE_ACCOUNT_USER=$(curl -H "Authorization: Bearer $TOKEN" \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_UUID}/service-account-user" | jq -r '.id')
+
+# Assign roles to the service account
+for ROLE in $ROLES; do
+    ROLE_ID=$(curl -H "Authorization: Bearer $TOKEN" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/roles/${ROLE}" \
+        | jq -r '.id')
+
+    curl -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '[{
+            "id": "'"${ROLE_ID}"'",
+            "name": "'"${ROLE}"'"
+        }]' \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/users/${SERVICE_ACCOUNT_USER}/role-mappings/realm"
+done
+
+
+echo "Initialization complete!"
