@@ -5,6 +5,7 @@ import (
 	"github.com/PTSS-Support/identity-service/domain/errors"
 	"github.com/PTSS-Support/identity-service/infrastructure/config"
 	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
 type CookieUtil struct {
@@ -18,25 +19,29 @@ func NewCookieUtil(config *config.Config) *CookieUtil {
 }
 
 func (cu *CookieUtil) SetAuthCookies(ctx *gin.Context, accessToken, refreshToken string) {
-	ctx.SetCookie(
-		cu.config.Auth.AccessTokenCookie,
-		accessToken,
-		cu.config.Auth.AccessTokenDuration,
-		cu.config.Auth.CookiePathRoot,
-		cu.config.Auth.CookieDomain,
-		cu.config.Auth.SecureAccesTokenFlag,
-		cu.config.Auth.HttpOnlyAccesTokenFlag,
-	)
+	cookie := &http.Cookie{
+		Name:     cu.config.Auth.AccessTokenCookie,
+		Value:    accessToken,
+		MaxAge:   cu.config.Auth.AccessTokenDuration,
+		Path:     cu.config.Auth.CookiePathRoot,
+		Domain:   cu.config.Auth.CookieDomain,
+		Secure:   cu.config.Auth.SecureAccesTokenFlag,
+		HttpOnly: cu.config.Auth.HttpOnlyAccesTokenFlag,
+		SameSite: http.SameSiteNoneMode,
+	}
+	http.SetCookie(ctx.Writer, cookie)
 
-	ctx.SetCookie(
-		cu.config.Auth.RefreshTokenCookie,
-		refreshToken,
-		cu.config.Auth.RefreshTokenDuration,
-		cu.config.Auth.CookiePathRoot,
-		cu.config.Auth.CookieDomain,
-		cu.config.Auth.SecureRefreshTokenFlag,
-		cu.config.Auth.HttpOnlyRefreshTokenFlag,
-	)
+	cookie = &http.Cookie{
+		Name:     cu.config.Auth.RefreshTokenCookie,
+		Value:    refreshToken,
+		MaxAge:   cu.config.Auth.RefreshTokenDuration,
+		Path:     cu.config.Auth.CookiePathRoot,
+		Domain:   cu.config.Auth.CookieDomain,
+		Secure:   cu.config.Auth.SecureRefreshTokenFlag,
+		HttpOnly: cu.config.Auth.HttpOnlyRefreshTokenFlag,
+		SameSite: http.SameSiteNoneMode,
+	}
+	http.SetCookie(ctx.Writer, cookie)
 }
 
 func (cu *CookieUtil) ClearAuthCookies(ctx *gin.Context) {
