@@ -86,6 +86,21 @@ if [ "$REALM_EXISTS" = "404" ]; then
         -d '{
                   "attributes": [
                       {
+                          "name": "userId",
+                          "displayName": "User ID",
+                          "required": {
+                              "roles": ["user"]
+                          },
+                          "permissions": {
+                              "view": ["admin", "user"],
+                              "edit": ["admin"]
+                          },
+                          "multivalued": false,
+                          "validations": {
+                              "length": { "min": 1, "max": 255 }
+                          }
+                      },
+                      {
                           "name": "username",
                           "displayName": "${username}",
                           "validations": {
@@ -273,12 +288,12 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
         -d '{
-            "name": "user-id",
+            "name": "user-id-mapper",
             "protocol": "openid-connect",
-            "protocolMapper": "oidc-usermodel-property-mapper",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
             "config": {
-                "user.attribute": "id",
-                "claim.name": "user_id",
+                "user.attribute": "userId",
+                "claim.name": "userId",
                 "jsonType.label": "String",
                 "id.token.claim": "true",
                 "access.token.claim": "true",
@@ -286,6 +301,7 @@ if [ "$CLIENT_EXISTS" = "0" ]; then
             }
         }' \
         "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}/client-scopes/${SCOPE_ID}/protocol-mappers/models"
+
     curl -X POST \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
